@@ -19,6 +19,7 @@ export function AssetGrid({
   onCopyPlatformsChange,
   selectedIds,
   onToggleSelect,
+  contextTagOptions,
 }: {
   items: MergedClip[];
   expandedId: string | null;
@@ -31,6 +32,7 @@ export function AssetGrid({
   onCopyPlatformsChange: (clipId: string, platforms: string[]) => void;
   selectedIds: string[];
   onToggleSelect: (clipId: string) => void;
+  contextTagOptions: string[];
 }) {
   const expandedItem = items.find((item) => item.clip.id === expandedId) ?? null;
 
@@ -137,6 +139,7 @@ export function AssetGrid({
             onLibraryChange={(row) => onLibraryChange(expandedItem.clip.id, row)}
             onClipDetailsChange={(updated) => onClipDetailsChange(expandedItem.clip.id, updated)}
             onCopyPlatformsChange={(platforms) => onCopyPlatformsChange(expandedItem.clip.id, platforms)}
+            contextTagOptions={contextTagOptions}
           />
         </div>
       )}

@@ -135,9 +135,9 @@ export type ClipDetailsListItem = Pick<
   | "usable"
   | "posted_to_tiktok"
   | "wardrobe"
-> & { representativePath: string | null; platforms: string[]; paths: string[] };
+> & { representativePath: string | null; representativeLink: string | null; platforms: string[]; paths: string[] };
 
-/** List logical clips for the asset table/filters, each with one representative physical path and the distinct set of platforms it was posted to (from both copies and clip_performance postings — excludes transcript/hooks, only needed on expand). */
+/** List logical clips for the asset table/filters, each with one representative physical path (for display/search — may be a bare Drive filename, not a URL), a representative clickable link (only ever a real 'url' copy, or null if the clip has no url-type copy), and the distinct set of platforms it was posted to (from both copies and clip_performance postings — excludes transcript/hooks, only needed on expand). */
 export async function listClipDetails(): Promise<ClipDetailsListItem[]> {
   const client = sql();
   const rows = (await client`
@@ -145,6 +145,7 @@ export async function listClipDetails(): Promise<ClipDetailsListItem[]> {
            cd.thumbnail, cd.title, cd.pillar, cd.season, cd.context_tags, cd.usable,
            cd.posted_to_tiktok, cd.wardrobe,
            (select c.path from clips c where c.clip_det_id = cd.id order by c.created_at limit 1) as "representativePath",
+           (select c.path from clips c where c.clip_det_id = cd.id and c.source_type = 'url' order by c.created_at limit 1) as "representativeLink",
            coalesce(
              (select array_agg(c.path) from clips c where c.clip_det_id = cd.id),
              '{}'
@@ -186,6 +187,22 @@ export async function listClipCopies(clipDetId: string): Promise<ClipCopy[]> {
     where clip_det_id = ${clipDetId}
     order by created_at
   `) as unknown as ClipCopy[];
+  return rows;
+}
+
+export type ClipPathMatch = { copyId: string; path: string; clipDetId: string; title: string | null };
+
+/** Finds existing copy paths (on OTHER clips) matching a search string — surfaces likely duplicates before adding a new copy. */
+export async function searchClipPaths(query: string, excludeClipDetId: string): Promise<ClipPathMatch[]> {
+  const client = sql();
+  const rows = (await client`
+    select c.id as "copyId", c.path, c.clip_det_id as "clipDetId", cd.title
+    from clips c
+    join clip_details cd on cd.id = c.clip_det_id
+    where c.path ilike ${"%" + query + "%"} and c.clip_det_id != ${excludeClipDetId}
+    order by c.created_at desc
+    limit 8
+  `) as unknown as ClipPathMatch[];
   return rows;
 }
 

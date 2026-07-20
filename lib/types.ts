@@ -9,8 +9,9 @@ export function displayTitle(item: MergedClip): string {
   return item.clip.title ?? item.clip.representativePath ?? item.clip.id;
 }
 
+/** Only ever a real URL-type copy — never a bare Drive filename, which isn't a valid link to open. */
 export function displayLink(item: MergedClip): string | null {
-  return item.clip.representativePath;
+  return item.clip.representativeLink;
 }
 
 /** ☀️ for קיץ, ❄️ for חורף, 🍂 for anything else (מעבר and legacy season values alike). */

@@ -10,6 +10,7 @@ import {
   listClipCopies,
   addClipCopy,
   removeClipCopy,
+  searchClipPaths,
   updateClipCopyPlatform,
   listClipPerformance,
   upsertClipPerformance,
@@ -59,6 +60,12 @@ export async function addClipCopyAction(
 ) {
   await requireSession();
   return addClipCopy(clipDetId, sourceType, path, platform);
+}
+
+export async function searchClipPathsAction(query: string, excludeClipDetId: string) {
+  await requireSession();
+  if (!query.trim()) return [];
+  return searchClipPaths(query.trim(), excludeClipDetId);
 }
 
 export async function removeClipCopyAction(copyId: string) {

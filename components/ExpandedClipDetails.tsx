@@ -9,10 +9,11 @@ import {
   updateClipCopyPlatformAction,
   listClipPerformanceAction,
   upsertClipPerformanceAction,
+  searchClipPathsAction,
 } from "@/app/actions";
 import { OPTIONS } from "@/lib/airtable";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
-import type { ClipCopy, ClipDetails, ClipLibraryRow, ClipPerformance } from "@/lib/neon";
+import type { ClipCopy, ClipDetails, ClipLibraryRow, ClipPathMatch, ClipPerformance } from "@/lib/neon";
 import { displayLink, displayTitle, seasonMatches, type MergedClip } from "@/lib/types";
 import { CopiesPanel } from "./CopiesPanel";
 
@@ -29,6 +30,7 @@ export function ExpandedClipDetails({
   onLibraryChange,
   onClipDetailsChange,
   onCopyPlatformsChange,
+  contextTagOptions,
 }: {
   item: MergedClip;
   fullClip: FullClip | null;
@@ -37,14 +39,18 @@ export function ExpandedClipDetails({
   onLibraryChange: (row: ClipLibraryRow | null) => void;
   onClipDetailsChange: (updated: ClipDetails | null) => void;
   onCopyPlatformsChange: (platforms: string[]) => void;
+  contextTagOptions: string[];
 }) {
   const [activeTab, setActiveTab] = useState<"details" | "copies">("details");
   const [showTranscript, setShowTranscript] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [tagInput, setTagInput] = useState("");
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const [saving, startSaving] = useTransition();
   const [copies, setCopies] = useState<ClipCopy[]>([]);
   const [newCopyPath, setNewCopyPath] = useState("");
+  const [pathMatches, setPathMatches] = useState<ClipPathMatch[]>([]);
+  const [pathDropdownOpen, setPathDropdownOpen] = useState(false);
   const [performance, setPerformance] = useState<ClipPerformance[]>([]);
   const [addingLinkFor, setAddingLinkFor] = useState<string | null>(null);
   const [linkInput, setLinkInput] = useState("");
@@ -58,6 +64,18 @@ export function ExpandedClipDetails({
     listClipCopiesAction(item.clip.id).then(setCopies);
     listClipPerformanceAction(item.clip.id).then(setPerformance);
   }, [item.clip.id]);
+
+  useEffect(() => {
+    const query = newCopyPath.trim();
+    const timeout = setTimeout(() => {
+      if (query.length < 2) {
+        setPathMatches([]);
+      } else {
+        searchClipPathsAction(query, item.clip.id).then(setPathMatches);
+      }
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [newCopyPath, item.clip.id]);
 
   function notifyPlatforms(nextCopies: ClipCopy[], nextPerformance: ClipPerformance[]) {
     const platforms = new Set<string>();
@@ -142,7 +160,13 @@ export function ExpandedClipDetails({
       const copy = await addClipCopyAction(item.clip.id, sourceType, path);
       setCopies((prev) => [...prev, copy]);
       setNewCopyPath("");
+      setPathMatches([]);
     });
+  }
+
+  function selectPathMatch(match: ClipPathMatch) {
+    setNewCopyPath(match.path);
+    setPathDropdownOpen(false);
   }
 
   function setCopyPlatform(copyId: string, platform: string) {
@@ -170,8 +194,20 @@ export function ExpandedClipDetails({
       return;
     }
     setTagInput("");
+    setTagDropdownOpen(false);
     saveContextTags([...contextTags, tag]);
   }
+
+  function selectExistingTag(tag: string) {
+    setTagInput("");
+    setTagDropdownOpen(false);
+    if (contextTags.includes(tag)) return;
+    saveContextTags([...contextTags, tag]);
+  }
+
+  const tagSuggestions = contextTagOptions.filter(
+    (t) => !contextTags.includes(t) && t.toLowerCase().includes(tagInput.trim().toLowerCase())
+  );
 
   function removeTag(tag: string) {
     saveContextTags(contextTags.filter((t) => t !== tag));
@@ -351,20 +387,53 @@ export function ExpandedClipDetails({
               <p className="text-xs text-on-surface-variant">אין עותקים</p>
             )}
 
-            <div className="flex items-center gap-2">
-              <input
-                value={newCopyPath}
-                onChange={(e) => setNewCopyPath(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addCopy();
-                  }
-                }}
-                placeholder="נתיב ב-Drive או קישור ביוטיוב..."
-                disabled={saving}
-                className="min-w-0 flex-1 rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-xs text-on-surface disabled:opacity-60"
-              />
+            <div className="flex items-start gap-2">
+              <div className="relative min-w-0 flex-1">
+                <input
+                  value={newCopyPath}
+                  onChange={(e) => {
+                    setNewCopyPath(e.target.value);
+                    setPathDropdownOpen(true);
+                  }}
+                  onFocus={() => setPathDropdownOpen(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addCopy();
+                    }
+                    if (e.key === "Escape") setPathDropdownOpen(false);
+                  }}
+                  placeholder="נתיב ב-Drive או קישור ביוטיוב..."
+                  disabled={saving}
+                  className="w-full rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-xs text-on-surface disabled:opacity-60"
+                />
+
+                {pathDropdownOpen && pathMatches.length > 0 && (
+                  <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded border border-outline-variant bg-surface-container-lowest shadow-lg">
+                    {pathMatches.map((match) => (
+                      <li key={match.copyId}>
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectPathMatch(match)}
+                          className="block w-full px-3 py-1.5 text-right text-xs hover:bg-surface-container"
+                        >
+                          <span className="block truncate text-on-surface">{match.path}</span>
+                          <span className="block truncate text-[10px] text-on-surface-variant/60">
+                            כבר קיים בקליפ: {match.title ?? "ללא כותרת"}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {pathMatches.some((m) => m.path.toLowerCase() === newCopyPath.trim().toLowerCase()) && (
+                  <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-error">
+                    <span className="material-symbols-outlined text-xs">warning</span>
+                    הנתיב הזה כבר קיים בקליפ אחר
+                  </p>
+                )}
+              </div>
               <button
                 onClick={addCopy}
                 disabled={saving || !newCopyPath.trim()}
@@ -488,43 +557,66 @@ export function ExpandedClipDetails({
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-primary">
             תגיות הקשר <span className="font-normal normal-case text-on-surface-variant/60">(אירועים, חגים, ריטריט ספציפי)</span>
           </label>
-          <div className="flex flex-wrap items-center gap-1.5 rounded border border-outline-variant bg-surface-container-lowest p-2">
-            {contextTags.map((tag) => (
-              <span
-                key={tag}
-                className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary"
-              >
-                {tag}
-                <button onClick={() => removeTag(tag)} disabled={saving} aria-label={`הסרת תגית ${tag}`}>
-                  <span className="material-symbols-outlined text-xs leading-none">close</span>
+          <div className="relative">
+            <div className="flex flex-wrap items-center gap-1.5 rounded border border-outline-variant bg-surface-container-lowest p-2">
+              {contextTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary"
+                >
+                  {tag}
+                  <button onClick={() => removeTag(tag)} disabled={saving} aria-label={`הסרת תגית ${tag}`}>
+                    <span className="material-symbols-outlined text-xs leading-none">close</span>
+                  </button>
+                </span>
+              ))}
+              {suggestedTag && (
+                <button
+                  onClick={() => acceptSuggestedTag(suggestedTag)}
+                  disabled={saving}
+                  title="תגית מוצעת מהניתוח האוטומטי — לחיצה מוסיפה אותה"
+                  className="flex items-center gap-1 rounded-full border border-dashed border-primary/50 px-2.5 py-1 text-[11px] font-bold text-primary disabled:opacity-60"
+                >
+                  <span className="material-symbols-outlined text-xs leading-none">add</span>
+                  {suggestedTag}
                 </button>
-              </span>
-            ))}
-            {suggestedTag && (
-              <button
-                onClick={() => acceptSuggestedTag(suggestedTag)}
+              )}
+              <input
+                value={tagInput}
                 disabled={saving}
-                title="תגית מוצעת מהניתוח האוטומטי — לחיצה מוסיפה אותה"
-                className="flex items-center gap-1 rounded-full border border-dashed border-primary/50 px-2.5 py-1 text-[11px] font-bold text-primary disabled:opacity-60"
-              >
-                <span className="material-symbols-outlined text-xs leading-none">add</span>
-                {suggestedTag}
-              </button>
+                onChange={(e) => {
+                  setTagInput(e.target.value);
+                  setTagDropdownOpen(true);
+                }}
+                onFocus={() => setTagDropdownOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addTag();
+                  }
+                  if (e.key === "Escape") setTagDropdownOpen(false);
+                }}
+                onBlur={addTag}
+                placeholder="הוספת תגית..."
+                className="min-w-[80px] flex-1 border-none bg-transparent p-1 text-xs text-on-surface focus:outline-none disabled:opacity-60"
+              />
+            </div>
+
+            {tagDropdownOpen && tagSuggestions.length > 0 && (
+              <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded border border-outline-variant bg-surface-container-lowest shadow-lg">
+                {tagSuggestions.map((tag) => (
+                  <li key={tag}>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectExistingTag(tag)}
+                      className="block w-full px-3 py-1.5 text-right text-xs text-on-surface hover:bg-surface-container"
+                    >
+                      {tag}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
-            <input
-              value={tagInput}
-              disabled={saving}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addTag();
-                }
-              }}
-              onBlur={addTag}
-              placeholder="הוספת תגית..."
-              className="min-w-[80px] flex-1 border-none bg-transparent p-1 text-xs text-on-surface focus:outline-none disabled:opacity-60"
-            />
           </div>
         </div>
 

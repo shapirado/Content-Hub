@@ -34,6 +34,7 @@ export function AssetTable({
   onCopyPlatformsChange,
   selectedIds,
   onToggleSelect,
+  contextTagOptions,
 }: {
   items: MergedClip[];
   expandedId: string | null;
@@ -46,6 +47,7 @@ export function AssetTable({
   onCopyPlatformsChange: (clipId: string, platforms: string[]) => void;
   selectedIds: string[];
   onToggleSelect: (clipId: string) => void;
+  contextTagOptions: string[];
 }) {
   return (
     <div className="col-span-12 mt-4">
@@ -174,6 +176,7 @@ export function AssetTable({
                   onLibraryChange={(row) => onLibraryChange(item.clip.id, row)}
                   onClipDetailsChange={(updated) => onClipDetailsChange(item.clip.id, updated)}
                   onCopyPlatformsChange={(platforms) => onCopyPlatformsChange(item.clip.id, platforms)}
+                  contextTagOptions={contextTagOptions}
                 />
               )}
             </div>

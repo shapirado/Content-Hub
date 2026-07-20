@@ -30,6 +30,7 @@ export function MediaLibraryApp({
   searchQuery?: string;
 }) {
   const [clips, setClips] = useState(initialClips);
+  const [tagOptions, setTagOptions] = useState(contextTagOptions);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -112,6 +113,7 @@ export function MediaLibraryApp({
           : c
       )
     );
+    setTagOptions((prev) => [...new Set([...prev, ...updated.context_tags])].sort((a, b) => a.localeCompare(b, "he")));
   }
 
   function updateCopyPlatforms(clipId: string, platforms: string[]) {
@@ -154,7 +156,7 @@ export function MediaLibraryApp({
           sort={sort}
           onSortChange={setSort}
           count={sorted.length}
-          contextTagOptions={contextTagOptions}
+          contextTagOptions={tagOptions}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
         />
@@ -173,6 +175,7 @@ export function MediaLibraryApp({
           onCopyPlatformsChange={updateCopyPlatforms}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
+          contextTagOptions={tagOptions}
         />
       ) : (
         <AssetGrid
@@ -187,6 +190,7 @@ export function MediaLibraryApp({
           onCopyPlatformsChange={updateCopyPlatforms}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
+          contextTagOptions={tagOptions}
         />
       )}
 
