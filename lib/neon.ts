@@ -345,6 +345,8 @@ export async function mergeClipDetails(
   await client`
     update clip_performance set clip_det_id = ${survivorId} where clip_det_id = ${loserId}
   `;
+  // clip_library has no cascade FK to clip_details (same as deleteClipDetails) — remove it first.
+  await client`delete from clip_library where clip_id = ${loserId}`;
   await client`delete from clip_details where id = ${loserId}`;
   return { repointedClipIds: copyRows.map((r) => r.id) };
 }
