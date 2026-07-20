@@ -303,19 +303,27 @@ export function ExpandedClipDetails({
                       <span className="block truncate">{c.path}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <select
-                        value={c.platform ?? ""}
-                        disabled={saving}
-                        onChange={(e) => setCopyPlatform(c.id, e.target.value)}
-                        className="rounded border border-outline-variant bg-surface-container px-2 py-1 text-[10px] text-on-surface disabled:opacity-60"
-                      >
-                        <option value="">פלטפורמה —</option>
-                        {PLATFORM_DISPLAY.map((p) => (
-                          <option key={p.key} value={p.key.toLowerCase()}>
-                            {p.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-1">
+                        {PLATFORM_DISPLAY.map(({ key, label, Icon, color }) => {
+                          const active = (c.platform ?? "").toLowerCase() === key.toLowerCase();
+                          return (
+                            <button
+                              key={key}
+                              title={label}
+                              disabled={saving}
+                              onClick={() => setCopyPlatform(c.id, active ? "" : key.toLowerCase())}
+                              style={active ? { borderColor: color, backgroundColor: `${color}1A` } : undefined}
+                              className={`flex h-6 w-6 items-center justify-center rounded-full border transition-colors disabled:opacity-60 ${
+                                active
+                                  ? ""
+                                  : "border-outline-variant text-on-surface-variant/50 hover:border-primary/40"
+                              }`}
+                            >
+                              <Icon className="h-3.5 w-3.5" style={active ? { color } : undefined} />
+                            </button>
+                          );
+                        })}
+                      </div>
                       {c.source_type === "url" && (
                         <a
                           href={c.path}
