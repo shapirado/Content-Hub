@@ -1,4 +1,4 @@
-import { InstagramIcon, TikTokIcon, WhatsAppIcon, YouTubeIcon } from "@/components/icons";
+import { GoogleDriveIcon, InstagramIcon, TikTokIcon, WhatsAppIcon, YouTubeIcon } from "@/components/icons";
 
 /**
  * Nirit always posts to both WhatsApp groups simultaneously, so the UI treats
@@ -15,6 +15,13 @@ export const PLATFORM_DISPLAY = [
     Icon: WhatsAppIcon,
     color: "#25D366",
     match: (p: string[]) => p.some((x) => x.startsWith("WhatsApp")),
+  },
+  {
+    key: "GoogleDrive",
+    label: "Google Drive",
+    Icon: GoogleDriveIcon,
+    color: "#00AC47",
+    match: (p: string[]) => p.includes("GoogleDrive"),
   },
 ] as const;
 

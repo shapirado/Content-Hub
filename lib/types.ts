@@ -1,4 +1,5 @@
 import type { ClipDetailsListItem, ClipLibraryRow } from "./neon";
+import { resolveCopyLink } from "./paths";
 
 export type MergedClip = {
   clip: ClipDetailsListItem;
@@ -6,12 +7,13 @@ export type MergedClip = {
 };
 
 export function displayTitle(item: MergedClip): string {
-  return item.clip.title ?? item.clip.representativePath ?? item.clip.id;
+  return item.clip.title ?? item.clip.original_filename ?? item.clip.representativePath ?? item.clip.id;
 }
 
-/** Only ever a real URL-type copy — never a bare Drive filename, which isn't a valid link to open. */
+/** A real URL if one exists, otherwise a Drive filename-search link resolved from the representative path. */
 export function displayLink(item: MergedClip): string | null {
-  return item.clip.representativeLink;
+  const path = item.clip.representativeLink ?? item.clip.representativePath;
+  return path ? resolveCopyLink(path) : null;
 }
 
 /** ☀️ for קיץ, ❄️ for חורף, 🍂 for anything else (מעבר and legacy season values alike). */

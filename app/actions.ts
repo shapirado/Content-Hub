@@ -11,7 +11,9 @@ import {
   addClipCopy,
   removeClipCopy,
   searchClipPaths,
+  listKnownDriveFolders,
   updateClipCopyPlatform,
+  updateClipCopyPath,
   listClipPerformance,
   upsertClipPerformance,
   deleteClipPerformance,
@@ -21,6 +23,7 @@ import {
   type ClipLibraryUpsert,
   type ClipPerformanceUpsert,
 } from "@/lib/neon";
+import { isUrlPath } from "@/lib/paths";
 import {
   FIELDS,
   createCopyRecord,
@@ -68,9 +71,19 @@ export async function searchClipPathsAction(query: string, excludeClipDetId: str
   return searchClipPaths(query.trim(), excludeClipDetId);
 }
 
+export async function listKnownDriveFoldersAction() {
+  await requireSession();
+  return listKnownDriveFolders();
+}
+
 export async function removeClipCopyAction(copyId: string) {
   await requireSession();
   return removeClipCopy(copyId);
+}
+
+export async function updateClipCopyPathAction(copyId: string, path: string) {
+  await requireSession();
+  return updateClipCopyPath(copyId, path);
 }
 
 export async function updateClipCopyPlatformAction(copyId: string, platform: string | null) {
@@ -204,7 +217,7 @@ async function getOrCreateRawClipRecord(clipId: string): Promise<string> {
   const details = await getClipDetails(clipId);
   if (!details) throw new Error("Clip not found");
   const copies = await listClipCopies(clipId);
-  const urlCopy = copies.find((c) => c.source_type === "url");
+  const urlCopy = copies.find((c) => isUrlPath(c.path));
 
   const created = await createRawClipLibraryRecord({
     [FIELDS.rawClipLibrary.name]: details.title ?? copies[0]?.path ?? "Untitled clip",

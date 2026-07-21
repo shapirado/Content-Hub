@@ -53,3 +53,18 @@ export function WhatsAppIcon({ className, title, style }: IconProps) {
     </svg>
   );
 }
+
+export function GoogleDriveIcon({ className, title, style }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} style={style} xmlns="http://www.w3.org/2000/svg">
+      {title && <title>{title}</title>}
+      <path
+        d="M9 3h6l7 12-3 5H5l-3-5 7-12z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M9 3l7 12M15 3L5 20" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}

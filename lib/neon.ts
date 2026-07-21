@@ -135,17 +135,24 @@ export type ClipDetailsListItem = Pick<
   | "usable"
   | "posted_to_tiktok"
   | "wardrobe"
-> & { representativePath: string | null; representativeLink: string | null; platforms: string[]; paths: string[] };
+> & {
+  representativePath: string | null;
+  representativeLink: string | null;
+  platforms: string[];
+  paths: string[];
+  /** Legacy clip_details.original_filename — still populated by the ingestion pipeline going forward, kept searchable alongside clips.path. */
+  original_filename: string | null;
+};
 
-/** List logical clips for the asset table/filters, each with one representative physical path (for display/search — may be a bare Drive filename, not a URL), a representative clickable link (only ever a real 'url' copy, or null if the clip has no url-type copy), and the distinct set of platforms it was posted to (from both copies and clip_performance postings — excludes transcript/hooks, only needed on expand). */
+/** List logical clips for the asset table/filters, each with one representative physical path (for display/search — may be a bare Drive filename, not a URL), a representative clickable link (the earliest copy whose path itself looks like a URL — checked against the path string, not `source_type`, since the ingestion pipeline's upload/url classification isn't reliable for that; null if no copy has an openable path), and the distinct set of platforms it was posted to (from both copies and clip_performance postings — excludes transcript/hooks, only needed on expand). */
 export async function listClipDetails(): Promise<ClipDetailsListItem[]> {
   const client = sql();
   const rows = (await client`
     select cd.id, cd.duration_seconds, cd.language, cd.summary, cd.warning, cd.created_at,
            cd.thumbnail, cd.title, cd.pillar, cd.season, cd.context_tags, cd.usable,
-           cd.posted_to_tiktok, cd.wardrobe,
+           cd.posted_to_tiktok, cd.wardrobe, cd.original_filename,
            (select c.path from clips c where c.clip_det_id = cd.id order by c.created_at limit 1) as "representativePath",
-           (select c.path from clips c where c.clip_det_id = cd.id and c.source_type = 'url' order by c.created_at limit 1) as "representativeLink",
+           (select c.path from clips c where c.clip_det_id = cd.id and c.path ~* '^https?://' order by c.created_at limit 1) as "representativeLink",
            coalesce(
              (select array_agg(c.path) from clips c where c.clip_det_id = cd.id),
              '{}'
@@ -156,6 +163,10 @@ export async function listClipDetails(): Promise<ClipDetailsListItem[]> {
                  select platform from clips where clip_det_id = cd.id and platform is not null
                  union
                  select platform from clip_performance where clip_det_id = cd.id and platform is not null
+                 union
+                 select 'googledrive' where exists (
+                   select 1 from clips where clip_det_id = cd.id and source_type = 'upload'
+                 )
                ) p
              ),
              '{}'
@@ -206,6 +217,18 @@ export async function searchClipPaths(query: string, excludeClipDetId: string): 
   return rows;
 }
 
+/** Distinct folder breadcrumbs already in use across non-URL (Drive) copy paths — the last `/`-segment (filename) is dropped, keeping only the folder chain, for suggesting known Drive folders when adding a new copy. */
+export async function listKnownDriveFolders(): Promise<string[]> {
+  const client = sql();
+  const rows = (await client`
+    select distinct path from clips
+    where path not ilike 'http%' and path like '%/%'
+  `) as unknown as { path: string }[];
+  return [
+    ...new Set(rows.map((r) => r.path.slice(0, r.path.lastIndexOf("/")))),
+  ];
+}
+
 export async function addClipCopy(
   clipDetId: string,
   sourceType: "upload" | "url",
@@ -227,6 +250,17 @@ export async function updateClipCopyPlatform(copyId: string, platform: string | 
   const client = sql();
   const rows = (await client`
     update clips set platform = ${platform} where id = ${copyId}
+    returning id, clip_det_id, source_type, path, platform, created_at
+  `) as unknown as ClipCopy[];
+  return rows[0];
+}
+
+/** Updates a copy's stored path (e.g. correcting a Drive breadcrumb/filename) — recomputes source_type from the new path since a corrected path may change from a bare filename to a real URL or vice versa. */
+export async function updateClipCopyPath(copyId: string, path: string): Promise<ClipCopy> {
+  const client = sql();
+  const sourceType = /^https?:\/\//i.test(path.trim()) ? "url" : "upload";
+  const rows = (await client`
+    update clips set path = ${path}, source_type = ${sourceType} where id = ${copyId}
     returning id, clip_det_id, source_type, path, platform, created_at
   `) as unknown as ClipCopy[];
   return rows[0];

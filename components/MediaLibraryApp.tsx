@@ -48,7 +48,8 @@ export function MediaLibraryApp({
       if (q) {
         const titleMatch = displayTitle(item).toLowerCase().includes(q);
         const linkMatch = item.clip.paths.some((p) => p.toLowerCase().includes(q));
-        if (!titleMatch && !linkMatch) return false;
+        const filenameMatch = (item.clip.original_filename ?? "").toLowerCase().includes(q);
+        if (!titleMatch && !linkMatch && !filenameMatch) return false;
       }
       if (filters.status === "unlinked" && item.library) return false;
       if (filters.status === "draft" && item.library?.status !== "Drafted") return false;
@@ -68,6 +69,7 @@ export function MediaLibraryApp({
         const count = item.clip.paths.length;
         if (filters.copies === "3+" ? count < 3 : count !== Number(filters.copies)) return false;
       }
+      if (filters.usable !== "all" && item.clip.usable !== filters.usable) return false;
       return true;
     });
   }, [clips, filters, searchQuery]);

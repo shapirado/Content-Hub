@@ -14,6 +14,7 @@ export type Filters = {
   wardrobe: string[];
   tag: string;
   copies: "all" | "1" | "2" | "3+";
+  usable: string;
 };
 
 export const DEFAULT_FILTERS: Filters = {
@@ -24,6 +25,7 @@ export const DEFAULT_FILTERS: Filters = {
   wardrobe: [],
   tag: "all",
   copies: "all",
+  usable: "all",
 };
 
 const STATUS_TABS: { key: Filters["status"]; label: string }[] = [
@@ -140,6 +142,19 @@ export function FilterBar({
           <option value="1">עותק אחד</option>
           <option value="2">2 עותקים</option>
           <option value="3+">3+ עותקים</option>
+        </select>
+
+        <select
+          value={filters.usable}
+          onChange={(e) => onChange({ ...filters, usable: e.target.value })}
+          className="cursor-pointer appearance-none rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 pl-10 text-xs text-on-surface shadow-sm focus:border-primary focus:ring-0"
+        >
+          <option value="all">שמיש: הכל</option>
+          {OPTIONS.usable.map((u) => (
+            <option key={u.value} value={u.value}>
+              {u.label}
+            </option>
+          ))}
         </select>
 
         {contextTagOptions.length > 0 && (

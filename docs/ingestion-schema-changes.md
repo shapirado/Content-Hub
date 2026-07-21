@@ -54,6 +54,22 @@ it's ingesting directly from an Instagram export) — leave it null otherwise; i
 Content Hub UI per copy, and the app now derives the "posted platforms" indicator on the clip list
 straight from this column.
 
+**Note on `source_type`:** the app does NOT use `source_type` to decide whether a copy is clickable —
+that's determined purely by whether `path` itself looks like a URL (`^https?://`), via `isUrlPath()` in
+`lib/paths.ts`. This is deliberate: if your pipeline's own upload/url classification doesn't line up with
+"is this actually an openable link" (e.g. you store a full Drive share URL but still classify it as
+`'upload'`), the app will still treat it as clickable correctly as long as the `path` is a real URL.
+So don't worry about getting `source_type` "right" for display purposes — just make sure `path` holds the
+actual link whenever you have one, even if that link happens to be a Drive URL rather than a YouTube one.
+
+**Note on Drive copies with no direct link:** many Drive files aren't directly link-shareable — all you
+have is where the file sits in the folder tree. For these, store the **full folder breadcrumb** as
+`path` (e.g. `פריטים ששותפו איתי/חגים ומועדים מיוחדים/מסך יום יהלומים 2026/פסח/ברכה לפסח ואחריה יהלומים
+mp4.(1)`), not just the bare filename — the app resolves any non-URL `path` to a Google Drive
+filename-search link (`resolveCopyLink()` in `lib/paths.ts`, using only the last `/`-separated segment),
+so the breadcrumb is both a useful location hint for a human and doesn't break the search-link fallback.
+`platform` can also now be `'googledrive'` for these copies, alongside `'instagram'`/`'youtube'`/etc.
+
 `clip_performance`, `clip_library`, and Airtable sync are unrelated to your pipeline — ignore them.
 
 ## What your insert needs to become

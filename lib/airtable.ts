@@ -73,7 +73,7 @@ export const OPTIONS = {
   usable: [
     { value: "Yes", label: "שמיש" },
     { value: "No", label: "לא לשימוש" },
-    { value: "Not Usable", label: "צריך עריכה" },
+    { value: "Not Usable", label: "דורש עריכה" },
   ],
   contentInventoryStatus: ["Drafted", "Reviewed", "Posted"],
   contentType: ["TikTok", "Instagram Reel", "Instagram Carousel"],
@@ -100,7 +100,7 @@ export const OPTIONS = {
     { value: "כתום בהיר", label: "כתום בהיר", colorHex: "#FDBA74", image: null },
     { value: "כתום כהה", label: "כתום כהה", colorHex: "#FF884E", image: null },
     { value: "תכלת בהיר", label: "תכלת בהיר", colorHex: "#97E0FF", image: null },
-    { value: "תכלת מקושקשת", label: "תכלת מקושקשת", colorHex: "#38BDF8", image: null },
+    { value: "תכלת מקושקשת", label: "תכלת מקושקשת", colorHex: null, image: "/תכלת מקושקש.png" },
     { value: "צהוב זרחני", label: "צהוב זרחני", colorHex: "#EFFF79", image: null },
     { value: "צבעוני", label: "צבעוני", colorHex: null, image: "/צבעוני.png" },
     { value: "דוגמא שחור על חום", label: "דוגמא שחור על חום", colorHex: null, image: "/דוגמא שחור על חום.png" },

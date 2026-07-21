@@ -7,12 +7,15 @@ import {
   addClipCopyAction,
   removeClipCopyAction,
   updateClipCopyPlatformAction,
+  updateClipCopyPathAction,
   listClipPerformanceAction,
   upsertClipPerformanceAction,
   searchClipPathsAction,
+  listKnownDriveFoldersAction,
 } from "@/app/actions";
 import { OPTIONS } from "@/lib/airtable";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
+import { isUrlPath, resolveCopyLink, KNOWN_DRIVE_FOLDERS, shortenFolderLabel } from "@/lib/paths";
 import type { ClipCopy, ClipDetails, ClipLibraryRow, ClipPathMatch, ClipPerformance } from "@/lib/neon";
 import { displayLink, displayTitle, seasonMatches, type MergedClip } from "@/lib/types";
 import { CopiesPanel } from "./CopiesPanel";
@@ -49,8 +52,9 @@ export function ExpandedClipDetails({
   const [saving, startSaving] = useTransition();
   const [copies, setCopies] = useState<ClipCopy[]>([]);
   const [newCopyPath, setNewCopyPath] = useState("");
-  const [pathMatches, setPathMatches] = useState<ClipPathMatch[]>([]);
-  const [pathDropdownOpen, setPathDropdownOpen] = useState(false);
+  const [knownFolders, setKnownFolders] = useState<string[]>(KNOWN_DRIVE_FOLDERS);
+  const [editingCopyId, setEditingCopyId] = useState<string | null>(null);
+  const [editPathInput, setEditPathInput] = useState("");
   const [performance, setPerformance] = useState<ClipPerformance[]>([]);
   const [addingLinkFor, setAddingLinkFor] = useState<string | null>(null);
   const [linkInput, setLinkInput] = useState("");
@@ -63,24 +67,16 @@ export function ExpandedClipDetails({
   useEffect(() => {
     listClipCopiesAction(item.clip.id).then(setCopies);
     listClipPerformanceAction(item.clip.id).then(setPerformance);
+    listKnownDriveFoldersAction().then((folders) =>
+      setKnownFolders([...new Set([...KNOWN_DRIVE_FOLDERS, ...folders])])
+    );
   }, [item.clip.id]);
-
-  useEffect(() => {
-    const query = newCopyPath.trim();
-    const timeout = setTimeout(() => {
-      if (query.length < 2) {
-        setPathMatches([]);
-      } else {
-        searchClipPathsAction(query, item.clip.id).then(setPathMatches);
-      }
-    }, 250);
-    return () => clearTimeout(timeout);
-  }, [newCopyPath, item.clip.id]);
 
   function notifyPlatforms(nextCopies: ClipCopy[], nextPerformance: ClipPerformance[]) {
     const platforms = new Set<string>();
     nextCopies.forEach((c) => c.platform && platforms.add(c.platform));
     nextPerformance.forEach((p) => p.platform && platforms.add(p.platform));
+    if (nextCopies.some((c) => c.source_type === "upload")) platforms.add("googledrive");
     onCopyPlatformsChange([...platforms]);
   }
 
@@ -88,13 +84,14 @@ export function ExpandedClipDetails({
     return performance.find((p) => (p.platform ?? "").toLowerCase() === key.toLowerCase()) ?? null;
   }
 
-  /** A clip whose own copy lives on a platform (e.g. it originated on Instagram, like the YouTube case) counts as posted-with-a-link there too, not just an explicit clip_performance posting. */
+  /** A clip whose own copy lives on a platform (e.g. it originated on Instagram, like the YouTube case, or a bare Drive path) counts as posted-with-a-link there too, not just an explicit clip_performance posting. Google Drive is special-cased: any 'upload' copy counts, whether or not its `platform` column is explicitly tagged "googledrive". */
   function platformStatus(key: string) {
-    const copy = copies.find(
-      (c) => c.source_type === "url" && (c.platform ?? "").toLowerCase() === key.toLowerCase()
-    );
+    const copy =
+      key.toLowerCase() === "googledrive"
+        ? copies.find((c) => c.source_type === "upload" || (c.platform ?? "").toLowerCase() === key.toLowerCase())
+        : copies.find((c) => (c.platform ?? "").toLowerCase() === key.toLowerCase());
     const perf = performanceFor(key);
-    const link = copy?.path ?? perf?.live_post_url ?? null;
+    const link = copy ? resolveCopyLink(copy.path) : (perf?.live_post_url ?? null);
     return { posted: !!copy || !!perf, link, perf };
   }
 
@@ -155,18 +152,12 @@ export function ExpandedClipDetails({
   function addCopy() {
     const path = newCopyPath.trim();
     if (!path) return;
-    const sourceType = /^https?:\/\//i.test(path) ? "url" : "upload";
+    const sourceType = isUrlPath(path) ? "url" : "upload";
     startSaving(async () => {
       const copy = await addClipCopyAction(item.clip.id, sourceType, path);
       setCopies((prev) => [...prev, copy]);
       setNewCopyPath("");
-      setPathMatches([]);
     });
-  }
-
-  function selectPathMatch(match: ClipPathMatch) {
-    setNewCopyPath(match.path);
-    setPathDropdownOpen(false);
   }
 
   function setCopyPlatform(copyId: string, platform: string) {
@@ -184,6 +175,23 @@ export function ExpandedClipDetails({
       const next = copies.filter((c) => c.id !== copyId);
       setCopies(next);
       notifyPlatforms(next, performance);
+    });
+  }
+
+  function startEditPath(copy: ClipCopy) {
+    setEditingCopyId(copy.id);
+    setEditPathInput(copy.path);
+  }
+
+  function saveEditPath(copyId: string) {
+    const path = editPathInput.trim();
+    if (!path) return;
+    startSaving(async () => {
+      const updated = await updateClipCopyPathAction(copyId, path);
+      const next = copies.map((c) => (c.id === copyId ? updated : c));
+      setCopies(next);
+      notifyPlatforms(next, performance);
+      setEditingCopyId(null);
     });
   }
 
@@ -332,11 +340,26 @@ export function ExpandedClipDetails({
                     key={c.id}
                     className="flex items-center justify-between gap-1.5 rounded border border-outline-variant/30 bg-surface-container-lowest p-3 text-xs text-on-surface-variant"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
-                        {c.source_type === "url" ? "קישור" : "קובץ ב-Google Drive"}
+                        {isUrlPath(c.path) ? "קישור" : "קובץ ב-Google Drive"}
                       </p>
-                      <span className="block truncate">{c.path}</span>
+                      {editingCopyId === c.id ? (
+                        <PathAutocompleteInput
+                          value={editPathInput}
+                          onChange={setEditPathInput}
+                          onCommit={() => saveEditPath(c.id)}
+                          onCancel={() => setEditingCopyId(null)}
+                          excludeClipDetId={item.clip.id}
+                          knownFolders={knownFolders}
+                          disabled={saving}
+                          autoFocus
+                          commitOnBlur
+                          inputClassName="w-full rounded border border-outline-variant bg-surface-container px-2 py-1 text-xs text-on-surface disabled:opacity-60"
+                        />
+                      ) : (
+                        <span className="block truncate" title={c.path}>{c.path}</span>
+                      )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <div className="flex items-center gap-1">
@@ -360,17 +383,23 @@ export function ExpandedClipDetails({
                           );
                         })}
                       </div>
-                      {c.source_type === "url" && (
-                        <a
-                          href={c.path}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={c.path}
-                          className="flex items-center gap-1 text-primary hover:underline"
-                        >
-                          <span className="material-symbols-outlined text-sm">open_in_new</span>
-                        </a>
-                      )}
+                      <a
+                        href={resolveCopyLink(c.path)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={c.path}
+                        className="flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                      </a>
+                      <button
+                        onClick={() => startEditPath(c)}
+                        disabled={saving}
+                        aria-label="עריכת נתיב"
+                        className="text-on-surface-variant/60 hover:text-primary disabled:opacity-60"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                      </button>
                       <button
                         onClick={() => removeCopy(c.id)}
                         disabled={saving}
@@ -388,52 +417,15 @@ export function ExpandedClipDetails({
             )}
 
             <div className="flex items-start gap-2">
-              <div className="relative min-w-0 flex-1">
-                <input
-                  value={newCopyPath}
-                  onChange={(e) => {
-                    setNewCopyPath(e.target.value);
-                    setPathDropdownOpen(true);
-                  }}
-                  onFocus={() => setPathDropdownOpen(true)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addCopy();
-                    }
-                    if (e.key === "Escape") setPathDropdownOpen(false);
-                  }}
-                  placeholder="נתיב ב-Drive או קישור ביוטיוב..."
-                  disabled={saving}
-                  className="w-full rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-xs text-on-surface disabled:opacity-60"
-                />
-
-                {pathDropdownOpen && pathMatches.length > 0 && (
-                  <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded border border-outline-variant bg-surface-container-lowest shadow-lg">
-                    {pathMatches.map((match) => (
-                      <li key={match.copyId}>
-                        <button
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => selectPathMatch(match)}
-                          className="block w-full px-3 py-1.5 text-right text-xs hover:bg-surface-container"
-                        >
-                          <span className="block truncate text-on-surface">{match.path}</span>
-                          <span className="block truncate text-[10px] text-on-surface-variant/60">
-                            כבר קיים בקליפ: {match.title ?? "ללא כותרת"}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {pathMatches.some((m) => m.path.toLowerCase() === newCopyPath.trim().toLowerCase()) && (
-                  <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-error">
-                    <span className="material-symbols-outlined text-xs">warning</span>
-                    הנתיב הזה כבר קיים בקליפ אחר
-                  </p>
-                )}
-              </div>
+              <PathAutocompleteInput
+                value={newCopyPath}
+                onChange={setNewCopyPath}
+                onCommit={addCopy}
+                excludeClipDetId={item.clip.id}
+                knownFolders={knownFolders}
+                disabled={saving}
+                placeholder="נתיב ב-Drive או קישור ביוטיוב..."
+              />
               <button
                 onClick={addCopy}
                 disabled={saving || !newCopyPath.trim()}
@@ -742,6 +734,140 @@ function Metric({ label, value }: { label: string; value: number | null }) {
     <div className="rounded border border-outline-variant/30 bg-surface-container-lowest p-3">
       <p className="mb-1 text-[10px] text-on-surface-variant">{label}</p>
       <span className="text-lg font-bold text-on-surface">{value ?? "—"}</span>
+    </div>
+  );
+}
+
+/**
+ * A Drive-path/URL input with the shared smart dropdown: known-folder suggestions (for a bare
+ * path with no `/` yet) and duplicate-path search against other clips — used for both adding a
+ * new copy and editing an existing one's path.
+ */
+function PathAutocompleteInput({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+  excludeClipDetId,
+  knownFolders,
+  disabled,
+  placeholder,
+  autoFocus,
+  commitOnBlur,
+  inputClassName,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+  onCancel?: () => void;
+  excludeClipDetId: string;
+  knownFolders: string[];
+  disabled?: boolean;
+  placeholder?: string;
+  autoFocus?: boolean;
+  commitOnBlur?: boolean;
+  inputClassName?: string;
+}) {
+  const [pathMatches, setPathMatches] = useState<ClipPathMatch[]>([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const query = value.trim();
+    const timeout = setTimeout(() => {
+      if (query.length < 2) {
+        setPathMatches([]);
+      } else {
+        searchClipPathsAction(query, excludeClipDetId).then(setPathMatches);
+      }
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [value, excludeClipDetId]);
+
+  const folderMatches =
+    !isUrlPath(value) && !value.includes("/")
+      ? knownFolders.filter((f) => shortenFolderLabel(f).toLowerCase().includes(value.trim().toLowerCase()))
+      : [];
+
+  return (
+    <div className="relative min-w-0 flex-1">
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setDropdownOpen(true);
+        }}
+        onFocus={() => setDropdownOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onCommit();
+          }
+          if (e.key === "Escape") {
+            setDropdownOpen(false);
+            onCancel?.();
+          }
+        }}
+        onBlur={() => {
+          if (commitOnBlur) onCommit();
+        }}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        disabled={disabled}
+        className={
+          inputClassName ??
+          "w-full rounded border border-outline-variant bg-surface-container-lowest px-3 py-2 text-xs text-on-surface disabled:opacity-60"
+        }
+      />
+
+      {dropdownOpen && (folderMatches.length > 0 || pathMatches.length > 0) && (
+        <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded border border-outline-variant bg-surface-container-lowest shadow-lg">
+          {folderMatches.length > 0 && (
+            <>
+              <li className="px-3 pt-1.5 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
+                תיקיות ידועות
+              </li>
+              {folderMatches.map((folder) => (
+                <li key={folder}>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onChange(folder + "/");
+                      setDropdownOpen(true);
+                    }}
+                    className="block w-full px-3 py-1.5 text-right text-xs text-on-surface hover:bg-surface-container"
+                  >
+                    {shortenFolderLabel(folder)}
+                  </button>
+                </li>
+              ))}
+            </>
+          )}
+          {pathMatches.map((match) => (
+            <li key={match.copyId}>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(match.path);
+                  setDropdownOpen(false);
+                }}
+                className="block w-full px-3 py-1.5 text-right text-xs hover:bg-surface-container"
+              >
+                <span className="block truncate text-on-surface">{match.path}</span>
+                <span className="block truncate text-[10px] text-on-surface-variant/60">
+                  כבר קיים בקליפ: {match.title ?? "ללא כותרת"}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {pathMatches.some((m) => m.path.toLowerCase() === value.trim().toLowerCase()) && (
+        <p className="mt-1 flex items-center gap-1 text-[10px] font-bold text-error">
+          <span className="material-symbols-outlined text-xs">warning</span>
+          הנתיב הזה כבר קיים בקליפ אחר
+        </p>
+      )}
     </div>
   );
 }
