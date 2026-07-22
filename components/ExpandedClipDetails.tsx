@@ -358,7 +358,12 @@ export function ExpandedClipDetails({
                           inputClassName="w-full rounded border border-outline-variant bg-surface-container px-2 py-1 text-xs text-on-surface disabled:opacity-60"
                         />
                       ) : (
-                        <span className="block truncate" title={c.path}>{c.path}</span>
+                        <>
+                          {c.title && (
+                            <span className="block truncate font-bold text-on-surface">{c.title}</span>
+                          )}
+                          <span className="block truncate" title={c.path}>{c.path}</span>
+                        </>
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">

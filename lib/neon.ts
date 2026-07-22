@@ -29,13 +29,14 @@ export type ClipDetails = {
   wardrobe: string | null;
 };
 
-/** One physical copy of a clip_details row (a Drive file or a YouTube upload). `platform` (e.g. "instagram") records where that specific copy was posted, when known. */
+/** One physical copy of a clip_details row (a Drive file or a YouTube upload). `platform` (e.g. "instagram") records where that specific copy was posted, when known. `title` is an optional human-friendly label for this specific copy. */
 export type ClipCopy = {
   id: string;
   clip_det_id: string;
   source_type: "upload" | "url";
   path: string;
   platform: string | null;
+  title: string | null;
   created_at: string;
 };
 
@@ -193,7 +194,7 @@ export async function getClipDetails(id: string): Promise<ClipDetails | null> {
 export async function listClipCopies(clipDetId: string): Promise<ClipCopy[]> {
   const client = sql();
   const rows = (await client`
-    select id, clip_det_id, source_type, path, platform, created_at
+    select id, clip_det_id, source_type, path, platform, title, created_at
     from clips
     where clip_det_id = ${clipDetId}
     order by created_at
@@ -240,7 +241,7 @@ export async function addClipCopy(
     insert into clips (clip_det_id, source_type, path, platform)
     values (${clipDetId}, ${sourceType}, ${path}, ${platform ?? null})
     on conflict (clip_det_id, path) do update set source_type = excluded.source_type, platform = excluded.platform
-    returning id, clip_det_id, source_type, path, platform, created_at
+    returning id, clip_det_id, source_type, path, platform, title, created_at
   `) as unknown as ClipCopy[];
   return rows[0];
 }
@@ -250,7 +251,7 @@ export async function updateClipCopyPlatform(copyId: string, platform: string | 
   const client = sql();
   const rows = (await client`
     update clips set platform = ${platform} where id = ${copyId}
-    returning id, clip_det_id, source_type, path, platform, created_at
+    returning id, clip_det_id, source_type, path, platform, title, created_at
   `) as unknown as ClipCopy[];
   return rows[0];
 }
@@ -261,7 +262,7 @@ export async function updateClipCopyPath(copyId: string, path: string): Promise<
   const sourceType = /^https?:\/\//i.test(path.trim()) ? "url" : "upload";
   const rows = (await client`
     update clips set path = ${path}, source_type = ${sourceType} where id = ${copyId}
-    returning id, clip_det_id, source_type, path, platform, created_at
+    returning id, clip_det_id, source_type, path, platform, title, created_at
   `) as unknown as ClipCopy[];
   return rows[0];
 }
