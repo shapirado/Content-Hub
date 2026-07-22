@@ -11,7 +11,7 @@ import {
   type MergedClip,
   type SortState,
 } from "@/lib/types";
-import { DEFAULT_FILTERS, FilterBar, NONE_VALUE, type Filters } from "./FilterBar";
+import { FilterBar, NONE_VALUE, type Filters } from "./FilterBar";
 import { AssetTable } from "./AssetTable";
 import { AssetGrid } from "./AssetGrid";
 import { SearchLinkModal } from "./SearchLinkModal";
@@ -24,14 +24,17 @@ export function MediaLibraryApp({
   initialClips,
   contextTagOptions,
   searchQuery = "",
+  filters,
+  onFiltersChange,
 }: {
   initialClips: MergedClip[];
   contextTagOptions: string[];
   searchQuery?: string;
+  filters: Filters;
+  onFiltersChange: (f: Filters) => void;
 }) {
   const [clips, setClips] = useState(initialClips);
   const [tagOptions, setTagOptions] = useState(contextTagOptions);
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedDetail, setExpandedDetail] = useState<FullClip | null>(null);
@@ -191,7 +194,7 @@ export function MediaLibraryApp({
       <div className="col-span-12">
         <FilterBar
           filters={filters}
-          onChange={setFilters}
+          onChange={onFiltersChange}
           sort={sort}
           onSortChange={setSort}
           count={sorted.length}
