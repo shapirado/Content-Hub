@@ -11,7 +11,7 @@ import {
   type MergedClip,
   type SortState,
 } from "@/lib/types";
-import { DEFAULT_FILTERS, FilterBar, type Filters } from "./FilterBar";
+import { DEFAULT_FILTERS, FilterBar, NONE_VALUE, type Filters } from "./FilterBar";
 import { AssetTable } from "./AssetTable";
 import { AssetGrid } from "./AssetGrid";
 import { SearchLinkModal } from "./SearchLinkModal";
@@ -41,6 +41,7 @@ export function MediaLibraryApp({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [pinnedId, setPinnedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -49,32 +50,60 @@ export function MediaLibraryApp({
         const titleMatch = displayTitle(item).toLowerCase().includes(q);
         const linkMatch = item.clip.paths.some((p) => p.toLowerCase().includes(q));
         const filenameMatch = (item.clip.original_filename ?? "").toLowerCase().includes(q);
-        if (!titleMatch && !linkMatch && !filenameMatch) return false;
+        const copyTitleMatch = item.clip.copyTitles.some((t) => t.toLowerCase().includes(q));
+        if (!titleMatch && !linkMatch && !filenameMatch && !copyTitleMatch) return false;
       }
       if (filters.status === "unlinked" && item.library) return false;
       if (filters.status === "draft" && item.library?.status !== "Drafted") return false;
       if (filters.status === "posted" && item.library?.status !== "Posted") return false;
-      if (filters.pillar !== "all" && item.clip.pillar !== filters.pillar) return false;
-      if (filters.season !== "all" && !seasonMatches(item.clip.season ?? null, filters.season))
-        return false;
-      if (filters.platform !== "all") {
-        const posted = item.clip.platforms.some((p) => p.toLowerCase() === filters.platform.toLowerCase());
-        if (!posted) return false;
+      if (filters.pillar !== "all") {
+        const matches = filters.pillar === NONE_VALUE ? item.clip.pillar == null : item.clip.pillar === filters.pillar;
+        if (!matches) return false;
       }
-      if (filters.wardrobe.length > 0 && !(item.clip.wardrobe && filters.wardrobe.includes(item.clip.wardrobe)))
-        return false;
-      if (filters.tag !== "all" && !(item.clip.context_tags ?? []).includes(filters.tag))
-        return false;
+      if (filters.season !== "all") {
+        const matches =
+          filters.season === NONE_VALUE
+            ? item.clip.season == null
+            : seasonMatches(item.clip.season ?? null, filters.season);
+        if (!matches) return false;
+      }
+      if (filters.platform !== "all") {
+        const matches =
+          filters.platform === NONE_VALUE
+            ? item.clip.platforms.length === 0
+            : item.clip.platforms.some((p) => p.toLowerCase() === filters.platform.toLowerCase());
+        if (!matches) return false;
+      }
+      if (filters.wardrobe.length > 0) {
+        const matches = item.clip.wardrobe
+          ? filters.wardrobe.includes(item.clip.wardrobe)
+          : filters.wardrobe.includes(NONE_VALUE);
+        if (!matches) return false;
+      }
+      if (filters.tag !== "all") {
+        const matches =
+          filters.tag === NONE_VALUE
+            ? (item.clip.context_tags ?? []).length === 0
+            : (item.clip.context_tags ?? []).includes(filters.tag);
+        if (!matches) return false;
+      }
       if (filters.copies !== "all") {
         const count = item.clip.paths.length;
         if (filters.copies === "3+" ? count < 3 : count !== Number(filters.copies)) return false;
       }
-      if (filters.usable !== "all" && item.clip.usable !== filters.usable) return false;
+      if (filters.usable !== "all") {
+        const matches = filters.usable === NONE_VALUE ? item.clip.usable == null : item.clip.usable === filters.usable;
+        if (!matches) return false;
+      }
       return true;
     });
   }, [clips, filters, searchQuery]);
 
   const sorted = useMemo(() => sortClips(filtered, sort), [filtered, sort]);
+
+  const pinnedItem = pinnedId ? (clips.find((c) => c.clip.id === pinnedId) ?? null) : null;
+  const gridItems =
+    viewMode === "grid" && pinnedId ? sorted.filter((c) => c.clip.id !== pinnedId) : sorted;
 
   async function toggleExpand(id: string) {
     if (expandedId === id) {
@@ -134,6 +163,8 @@ export function MediaLibraryApp({
     .map((id) => clips.find((c) => c.clip.id === id))
     .filter((c): c is MergedClip => !!c);
 
+  const mergeItems = pinnedItem ? [pinnedItem, ...selectedItems] : selectedItems;
+
   function handleDeleted(deletedIds: string[]) {
     setClips((prev) => prev.filter((c) => !deletedIds.includes(c.clip.id)));
     setSelectedIds([]);
@@ -141,12 +172,18 @@ export function MediaLibraryApp({
       setExpandedId(null);
       setExpandedDetail(null);
     }
+    if (pinnedId && deletedIds.includes(pinnedId)) setPinnedId(null);
   }
 
   function handleMerged(survivorId: string, loserIds: string[], updatedSurvivor: ClipDetails | null) {
     setClips((prev) => prev.filter((c) => !loserIds.includes(c.clip.id)));
     updateClipDetails(survivorId, updatedSurvivor);
     setSelectedIds([]);
+    if (pinnedId && loserIds.includes(pinnedId)) setPinnedId(null);
+  }
+
+  function togglePin(id: string) {
+    setPinnedId((prev) => (prev === id ? null : id));
   }
 
   return (
@@ -181,7 +218,7 @@ export function MediaLibraryApp({
         />
       ) : (
         <AssetGrid
-          items={sorted}
+          items={gridItems}
           expandedId={expandedId}
           onToggleExpand={toggleExpand}
           expandedFullClip={expandedDetail}
@@ -193,7 +230,43 @@ export function MediaLibraryApp({
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           contextTagOptions={tagOptions}
+          pinnedId={pinnedId}
+          onPin={togglePin}
         />
+      )}
+
+      {pinnedItem && (
+        <div className="fixed left-8 top-24 z-30 flex w-44 flex-col items-center gap-2 rounded-lg border-2 border-primary bg-surface-container p-3 shadow-2xl">
+          <div className="flex w-full items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+              מחפשים התאמה
+            </span>
+            <button
+              onClick={() => setPinnedId(null)}
+              aria-label="ביטול חיפוש התאמה"
+              className="text-on-surface-variant hover:text-on-surface"
+            >
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+          <div className="flex h-64 w-40 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-high">
+            {pinnedItem.clip.thumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={pinnedItem.clip.thumbnail}
+                alt={pinnedItem.clip.title ?? "clip thumbnail"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="material-symbols-outlined text-4xl text-on-surface-variant/40">
+                movie
+              </span>
+            )}
+          </div>
+          <p className="w-40 truncate text-center text-xs font-bold text-on-surface">
+            {displayTitle(pinnedItem)}
+          </p>
+        </div>
       )}
 
       {searchLinkClipId && (
@@ -218,8 +291,8 @@ export function MediaLibraryApp({
           </button>
           <button
             onClick={() => setMergeOpen(true)}
-            disabled={selectedItems.length < 2}
-            title={selectedItems.length < 2 ? "יש לבחור לפחות 2 קליפים" : undefined}
+            disabled={mergeItems.length < 2}
+            title={mergeItems.length < 2 ? "יש לבחור לפחות 2 קליפים" : undefined}
             className="rounded-full bg-primary px-4 py-2 text-xs font-bold text-on-primary hover:opacity-90 disabled:opacity-40"
           >
             קישור כעותקים
@@ -241,9 +314,9 @@ export function MediaLibraryApp({
         />
       )}
 
-      {mergeOpen && selectedItems.length >= 2 && (
+      {mergeOpen && mergeItems.length >= 2 && (
         <MergeCopiesModal
-          items={selectedItems}
+          items={mergeItems}
           onClose={() => setMergeOpen(false)}
           onMerged={handleMerged}
         />

@@ -143,6 +143,8 @@ export type ClipDetailsListItem = Pick<
   paths: string[];
   /** Legacy clip_details.original_filename — still populated by the ingestion pipeline going forward, kept searchable alongside clips.path. */
   original_filename: string | null;
+  /** Non-null clips.title values across this clip's copies, kept searchable alongside path/filename. */
+  copyTitles: string[];
 };
 
 /** List logical clips for the asset table/filters, each with one representative physical path (for display/search — may be a bare Drive filename, not a URL), a representative clickable link (the earliest copy whose path itself looks like a URL — checked against the path string, not `source_type`, since the ingestion pipeline's upload/url classification isn't reliable for that; null if no copy has an openable path), and the distinct set of platforms it was posted to (from both copies and clip_performance postings — excludes transcript/hooks, only needed on expand). */
@@ -158,6 +160,10 @@ export async function listClipDetails(): Promise<ClipDetailsListItem[]> {
              (select array_agg(c.path) from clips c where c.clip_det_id = cd.id),
              '{}'
            ) as "paths",
+           coalesce(
+             (select array_agg(c.title) from clips c where c.clip_det_id = cd.id and c.title is not null),
+             '{}'
+           ) as "copyTitles",
            coalesce(
              (
                select array_agg(distinct platform) from (

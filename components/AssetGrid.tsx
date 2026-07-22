@@ -20,6 +20,8 @@ export function AssetGrid({
   selectedIds,
   onToggleSelect,
   contextTagOptions,
+  pinnedId,
+  onPin,
 }: {
   items: MergedClip[];
   expandedId: string | null;
@@ -33,6 +35,8 @@ export function AssetGrid({
   selectedIds: string[];
   onToggleSelect: (clipId: string) => void;
   contextTagOptions: string[];
+  pinnedId: string | null;
+  onPin: (clipId: string) => void;
 }) {
   const expandedItem = items.find((item) => item.clip.id === expandedId) ?? null;
 
@@ -48,10 +52,18 @@ export function AssetGrid({
           const isSelected = selectedIds.includes(item.clip.id);
           const link = displayLink(item);
           return (
-            <button
+            <div
               key={item.clip.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onToggleExpand(item.clip.id)}
-              className={`flex flex-col items-center gap-2 rounded-lg border p-3 text-right transition-colors hover:bg-surface-container-highest ${
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onToggleExpand(item.clip.id);
+                }
+              }}
+              className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-3 text-right transition-colors hover:bg-surface-container-highest ${
                 isExpanded ? "border-primary bg-primary/10" : "border-outline-variant bg-surface-container"
               }`}
             >
@@ -79,6 +91,20 @@ export function AssetGrid({
                   className="absolute right-2 top-2 h-4 w-4"
                   aria-label="בחירת קליפ"
                 />
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPin(item.clip.id);
+                  }}
+                  title="חיפוש התאמה"
+                  aria-label="חיפוש התאמה"
+                  className={`absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-surface-container-lowest/90 ${
+                    pinnedId === item.clip.id ? "text-primary" : "text-on-surface-variant hover:text-primary"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-sm">push_pin</span>
+                </button>
 
                 {link && (
                   <a
@@ -118,7 +144,7 @@ export function AssetGrid({
                   })}
                 </div>
               </div>
-            </button>
+            </div>
           );
         })}
 

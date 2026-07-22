@@ -5,6 +5,9 @@ import { OPTIONS } from "@/lib/airtable";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
 import type { SortField, SortState } from "@/lib/types";
 
+/** Sentinel filter value meaning "the field is empty/null" — distinct from "all". */
+export const NONE_VALUE = "__none__";
+
 export type Filters = {
   status: "all" | "draft" | "posted" | "unlinked";
   pillar: string;
@@ -95,6 +98,7 @@ export function FilterBar({
           className="cursor-pointer appearance-none rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 pl-10 text-xs text-on-surface shadow-sm focus:border-primary focus:ring-0"
         >
           <option value="all">עונה: הכל</option>
+          <option value={NONE_VALUE}>לא נבחר</option>
           {OPTIONS.season.map((s) => (
             <option key={s.value} value={s.value}>
               {s.icon} {s.label}
@@ -108,6 +112,7 @@ export function FilterBar({
           className="cursor-pointer appearance-none rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 pl-10 text-xs text-on-surface shadow-sm focus:border-primary focus:ring-0"
         >
           <option value="all">פילר: הכל</option>
+          <option value={NONE_VALUE}>לא נבחר</option>
           {OPTIONS.pillar.map((p) => (
             <option key={p} value={p}>
               {p}
@@ -121,6 +126,7 @@ export function FilterBar({
           className="cursor-pointer appearance-none rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 pl-10 text-xs text-on-surface shadow-sm focus:border-primary focus:ring-0"
         >
           <option value="all">פלטפורמה: הכל</option>
+          <option value={NONE_VALUE}>לא נבחר</option>
           {PLATFORM_DISPLAY.map((p) => (
             <option key={p.key} value={p.key}>
               {p.label}
@@ -150,6 +156,7 @@ export function FilterBar({
           className="cursor-pointer appearance-none rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 pl-10 text-xs text-on-surface shadow-sm focus:border-primary focus:ring-0"
         >
           <option value="all">שמיש: הכל</option>
+          <option value={NONE_VALUE}>לא נבחר</option>
           {OPTIONS.usable.map((u) => (
             <option key={u.value} value={u.value}>
               {u.label}
@@ -164,6 +171,7 @@ export function FilterBar({
             className="cursor-pointer appearance-none rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 pl-10 text-xs text-on-surface shadow-sm focus:border-primary focus:ring-0"
           >
             <option value="all">תגית: הכל</option>
+            <option value={NONE_VALUE}>לא נבחר</option>
             {contextTagOptions.map((t) => (
               <option key={t} value={t}>
                 {t}
@@ -255,7 +263,7 @@ function WardrobeMultiSelect({
     selected.length === 0
       ? "צעיף: הכל"
       : selected.length === 1
-        ? `צעיף: ${selected[0]}`
+        ? `צעיף: ${selected[0] === NONE_VALUE ? "לא נבחר" : selected[0]}`
         : `צעיף: ${selected.length} נבחרו`;
 
   return (
@@ -276,6 +284,16 @@ function WardrobeMultiSelect({
           >
             נקה בחירה
           </button>
+          <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-on-surface hover:bg-surface-container">
+            <input
+              type="checkbox"
+              checked={selected.includes(NONE_VALUE)}
+              onChange={() => toggle(NONE_VALUE)}
+              className="h-3.5 w-3.5"
+            />
+            <span className="h-4 w-4 shrink-0 rounded-full border-2 border-dashed border-outline-variant bg-transparent" />
+            לא נבחר
+          </label>
           {OPTIONS.wardrobe.map((w) => (
             <label
               key={w.value}
