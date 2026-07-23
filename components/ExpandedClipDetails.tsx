@@ -247,9 +247,6 @@ export function ExpandedClipDetails({
                 <h3 className="mb-2 text-headline-sm font-headline-sm text-on-surface">
                   סיכום וידאו
                 </h3>
-                 <p className="text-xs font-bold leading-relaxed text-on-surface-variant style=font-style: italic padding-bottom: 24px">
-                  {item.clip.representativePath}
-                </p>
                 <p className="text-sm leading-relaxed text-on-surface-variant">
                   {fullClip.summary ?? "אין סיכום זמין עדיין"}
                 </p>
