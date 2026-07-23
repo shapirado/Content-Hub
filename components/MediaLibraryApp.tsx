@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { getClipDetailAction } from "@/app/actions";
+import { getClipDetailAction, exportClipsAction } from "@/app/actions";
 import type { ClipDetails, ClipDetailsListItem, ClipLibraryRow } from "@/lib/neon";
 import {
   DEFAULT_SORT,
@@ -45,6 +45,7 @@ export function MediaLibraryApp({
   const [mergeOpen, setMergeOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [pinnedId, setPinnedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -70,11 +71,13 @@ export function MediaLibraryApp({
             : seasonMatches(item.clip.season ?? null, filters.season);
         if (!matches) return false;
       }
-      if (filters.platform !== "all") {
+      if (filters.platform.length > 0) {
         const matches =
-          filters.platform === NONE_VALUE
-            ? item.clip.platforms.length === 0
-            : item.clip.platforms.some((p) => p.toLowerCase() === filters.platform.toLowerCase());
+          item.clip.platforms.length === 0
+            ? filters.platform.includes(NONE_VALUE)
+            : filters.platform.some((f) =>
+                item.clip.platforms.some((p) => p.toLowerCase() === f.toLowerCase())
+              );
         if (!matches) return false;
       }
       if (filters.wardrobe.length > 0) {
@@ -189,6 +192,21 @@ export function MediaLibraryApp({
     setPinnedId((prev) => (prev === id ? null : id));
   }
 
+  function downloadJson() {
+    setExporting(true);
+    exportClipsAction(sorted.map((item) => item.clip.id))
+      .then((rows) => {
+        const blob = new Blob([JSON.stringify(rows, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `content-hub-export-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      })
+      .finally(() => setExporting(false));
+  }
+
   return (
     <div className="grid grid-cols-12 gap-8">
       <div className="col-span-12">
@@ -201,6 +219,8 @@ export function MediaLibraryApp({
           contextTagOptions={tagOptions}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          onExport={downloadJson}
+          exporting={exporting}
         />
       </div>
 

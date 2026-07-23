@@ -360,6 +360,17 @@ export async function updateClipTitle(id: string, title: string): Promise<void> 
   await client`update clip_details set title = ${title} where id = ${id}`;
 }
 
+/** Direct Neon write for a manual transcript correction. */
+export async function updateClipTranscript(id: string, transcript: string): Promise<ClipDetails | null> {
+  const client = sql();
+  const rows = (await client`
+    update clip_details set transcript = ${transcript} where id = ${id}
+    returning id, duration_seconds, language, transcript, summary, hooks, warning, created_at,
+              thumbnail, tag, title, pillar, season, context_tags, usable, posted_to_tiktok, wardrobe
+  `) as unknown as ClipDetails[];
+  return rows[0] ?? null;
+}
+
 /** Deletes a logical clip. clip_library has no cascade FK to clip_details, so it's deleted explicitly first; clips/clip_performance cascade automatically. */
 export async function deleteClipDetails(id: string): Promise<void> {
   const client = sql();
@@ -436,6 +447,63 @@ export async function upsertClipLibraryRow(row: ClipLibraryUpsert): Promise<void
       copies = excluded.copies,
       updated_at = now()
   `;
+}
+
+export type ClipExportRow = {
+  clip_id: string;
+  source_type: string | null;
+  source_url: string | null;
+  original_filename: string | null;
+  duration_seconds: number | null;
+  language: string | null;
+  transcript: string;
+  summary: string | null;
+  hooks: string[];
+  warning: string | null;
+  clip_created_at: string;
+  thumbnail: string | null;
+  tag: string | null;
+  title: string | null;
+  pillar: string | null;
+  season: string | null;
+  context_tags: string[];
+  usable: string | null;
+  posted_to_tiktok: boolean | null;
+  wardrobe: string | null;
+  performance_id: string | null;
+  performance_platform: string | null;
+  views: number | null;
+  likes: number | null;
+  shares: number | null;
+  comments: number | null;
+  status: string | null;
+  hook_key_line: string | null;
+  hashtags: string | null;
+  live_post_url: string | null;
+  date_posted: string | null;
+  performance_created_at: string | null;
+  performance_updated_at: string | null;
+};
+
+/** Every clip_details field for the given ids, one row per matching clip_performance record (or one row with null performance fields if the clip has none) — for CSV export of whatever's currently filtered/searched in the UI. */
+export async function getClipsForExport(ids: string[]): Promise<ClipExportRow[]> {
+  if (ids.length === 0) return [];
+  const client = sql();
+  const rows = (await client`
+    select
+      cd.id as clip_id, cd.source_type, cd.source_url, cd.original_filename,
+      cd.duration_seconds, cd.language, cd.transcript, cd.summary, cd.hooks, cd.warning,
+      cd.created_at as clip_created_at, cd.thumbnail, cd.tag, cd.title, cd.pillar, cd.season,
+      cd.context_tags, cd.usable, cd.posted_to_tiktok, cd.wardrobe,
+      cp.id as performance_id, cp.platform as performance_platform, cp.views, cp.likes,
+      cp.shares, cp.comments, cp.status, cp.hook_key_line, cp.hashtags, cp.live_post_url,
+      cp.date_posted, cp.created_at as performance_created_at, cp.updated_at as performance_updated_at
+    from clip_details cd
+    left join clip_performance cp on cp.clip_det_id = cd.id
+    where cd.id = any(${ids})
+    order by cd.created_at desc, cp.date_posted desc nulls last
+  `) as unknown as ClipExportRow[];
+  return rows;
 }
 
 /** Re-points every clip_library row that references the losing Raw Clip Library record onto the survivor — used when merging duplicate Airtable records. Returns the affected clip_ids so their cached fields can be re-synced. */

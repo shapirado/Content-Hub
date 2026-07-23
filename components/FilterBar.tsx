@@ -12,7 +12,8 @@ export type Filters = {
   status: "all" | "draft" | "posted" | "unlinked";
   pillar: string;
   season: string;
-  platform: string;
+  /** Empty = all. */
+  platform: string[];
   /** Empty = all. */
   wardrobe: string[];
   tag: string;
@@ -24,7 +25,7 @@ export const DEFAULT_FILTERS: Filters = {
   status: "all",
   pillar: "all",
   season: "all",
-  platform: "all",
+  platform: [],
   wardrobe: [],
   tag: "all",
   copies: "all",
@@ -56,6 +57,8 @@ export function FilterBar({
   contextTagOptions,
   viewMode,
   onViewModeChange,
+  onExport,
+  exporting,
 }: {
   filters: Filters;
   onChange: (f: Filters) => void;
@@ -65,6 +68,8 @@ export function FilterBar({
   contextTagOptions: string[];
   viewMode: "list" | "grid";
   onViewModeChange: (mode: "list" | "grid") => void;
+  onExport: () => void;
+  exporting: boolean;
 }) {
   return (
     <section className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -120,19 +125,10 @@ export function FilterBar({
           ))}
         </select>
 
-        <select
-          value={filters.platform}
-          onChange={(e) => onChange({ ...filters, platform: e.target.value })}
-          className="cursor-pointer appearance-none rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 pl-10 text-xs text-on-surface shadow-sm focus:border-primary focus:ring-0"
-        >
-          <option value="all">פלטפורמה: הכל</option>
-          <option value={NONE_VALUE}>לא נבחר</option>
-          {PLATFORM_DISPLAY.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+        <PlatformMultiSelect
+          selected={filters.platform}
+          onChange={(platform) => onChange({ ...filters, platform })}
+        />
 
         <WardrobeMultiSelect
           selected={filters.wardrobe}
@@ -204,6 +200,16 @@ export function FilterBar({
             <span className="material-symbols-outlined text-base">grid_view</span>
           </button>
         </div>
+
+        <button
+          onClick={onExport}
+          disabled={exporting || count === 0}
+          title="ייצוא הרשימה המסוננת ל-JSON"
+          className="flex items-center gap-1.5 rounded-full border border-outline-variant px-4 py-2 text-xs font-bold text-on-surface-variant transition-colors hover:border-primary/40 hover:text-on-surface disabled:opacity-40"
+        >
+          <span className="material-symbols-outlined text-sm">download</span>
+          {exporting ? "מייצאת..." : "ייצוא ל-JSON"}
+        </button>
       </div>
 
       <div className="flex w-full basis-full items-center gap-2">
@@ -234,6 +240,87 @@ export function FilterBar({
         ))}
       </div>
     </section>
+  );
+}
+
+function PlatformMultiSelect({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function toggle(value: string) {
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+  }
+
+  const platformLabel = (value: string) =>
+    value === NONE_VALUE ? "לא נבחר" : (PLATFORM_DISPLAY.find((p) => p.key === value)?.label ?? value);
+
+  const label =
+    selected.length === 0
+      ? "פלטפורמה: הכל"
+      : selected.length === 1
+        ? `פלטפורמה: ${platformLabel(selected[0])}`
+        : `פלטפורמה: ${selected.length} נבחרו`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex cursor-pointer items-center gap-1.5 rounded border border-outline-variant bg-surface-container-lowest px-4 py-2 text-xs text-on-surface shadow-sm"
+      >
+        {label}
+        <span className="material-symbols-outlined text-sm">expand_more</span>
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded border border-outline-variant bg-surface-container-lowest p-2 shadow-lg">
+          <button
+            onClick={() => onChange([])}
+            className="mb-1 w-full rounded px-2 py-1 text-right text-xs font-bold text-primary hover:bg-surface-container"
+          >
+            נקה בחירה
+          </button>
+          <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-on-surface hover:bg-surface-container">
+            <input
+              type="checkbox"
+              checked={selected.includes(NONE_VALUE)}
+              onChange={() => toggle(NONE_VALUE)}
+              className="h-3.5 w-3.5"
+            />
+            <span className="h-4 w-4 shrink-0 rounded-full border-2 border-dashed border-outline-variant bg-transparent" />
+            לא נבחר
+          </label>
+          {PLATFORM_DISPLAY.map(({ key, label: platName, Icon, color }) => (
+            <label
+              key={key}
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-on-surface hover:bg-surface-container"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(key)}
+                onChange={() => toggle(key)}
+                className="h-3.5 w-3.5"
+              />
+              <Icon className="h-4 w-4" style={{ color }} />
+              {platName}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

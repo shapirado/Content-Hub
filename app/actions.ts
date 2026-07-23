@@ -18,10 +18,13 @@ import {
   upsertClipPerformance,
   deleteClipPerformance,
   updateClipDetailsMetadata,
+  updateClipTranscript,
   mergeClipDetails,
   deleteClipDetails,
+  getClipsForExport,
   type ClipLibraryUpsert,
   type ClipPerformanceUpsert,
+  type ClipExportRow,
 } from "@/lib/neon";
 import { isUrlPath } from "@/lib/paths";
 import {
@@ -258,6 +261,11 @@ export async function updateClipMetadataAction(
   return updateClipDetailsMetadata(clipId, updates);
 }
 
+export async function updateClipTranscriptAction(clipId: string, transcript: string) {
+  await requireSession();
+  return updateClipTranscript(clipId, transcript);
+}
+
 export async function searchCopiesAction(query: string) {
   await requireSession();
   if (!query.trim()) return [];
@@ -402,4 +410,10 @@ export async function mergeRawClipRecordsAction(
   await Promise.all(clipIdsToSync.map((clipId) => syncClipLibraryFromRawClip(clipId, survivorId)));
 
   return { survivorId, syncedClipIds: clipIdsToSync };
+}
+
+/** Every clip_details field, one row per matching clip_performance record, for whichever clip ids are currently filtered/searched in the UI. */
+export async function exportClipsAction(clipIds: string[]): Promise<ClipExportRow[]> {
+  await requireSession();
+  return getClipsForExport(clipIds);
 }

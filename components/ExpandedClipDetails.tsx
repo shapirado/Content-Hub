@@ -12,6 +12,7 @@ import {
   upsertClipPerformanceAction,
   searchClipPathsAction,
   listKnownDriveFoldersAction,
+  updateClipTranscriptAction,
 } from "@/app/actions";
 import { OPTIONS } from "@/lib/airtable";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
@@ -46,6 +47,8 @@ export function ExpandedClipDetails({
 }) {
   const [activeTab, setActiveTab] = useState<"details" | "copies">("details");
   const [showTranscript, setShowTranscript] = useState(false);
+  const [editingTranscript, setEditingTranscript] = useState(false);
+  const [transcriptText, setTranscriptText] = useState(fullClip?.transcript ?? "");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
@@ -60,7 +63,7 @@ export function ExpandedClipDetails({
   const [linkInput, setLinkInput] = useState("");
 
   const library = item.library;
-  const thumbnail = fullClip?.thumbnail ?? item.clip.thumbnail;
+  const thumbnail = item.clip.thumbnail ?? fullClip?.thumbnail ?? null;
   const link = displayLink(item);
   const contextTags = item.clip.context_tags ?? [];
 
@@ -71,6 +74,22 @@ export function ExpandedClipDetails({
       setKnownFolders([...new Set([...KNOWN_DRIVE_FOLDERS, ...folders])])
     );
   }, [item.clip.id]);
+
+  function startEditTranscript() {
+    setTranscriptText(fullClip?.transcript ?? "");
+    setEditingTranscript(true);
+  }
+
+  function saveTranscript() {
+    startSaving(async () => {
+      await updateClipTranscriptAction(item.clip.id, transcriptText);
+      setEditingTranscript(false);
+    });
+  }
+
+  function cancelEditTranscript() {
+    setEditingTranscript(false);
+  }
 
   function notifyPlatforms(nextCopies: ClipCopy[], nextPerformance: ClipPerformance[]) {
     const platforms = new Set<string>();
@@ -284,19 +303,57 @@ export function ExpandedClipDetails({
                 </div>
               )}
 
-              {fullClip.transcript && (
-                <button
-                  onClick={() => setShowTranscript((v) => !v)}
-                  className="flex items-center gap-2 pt-1 text-xs font-bold uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
-                >
-                  <span className="material-symbols-outlined text-sm">description</span>
-                  {showTranscript ? "הסתרת תמלול" : "תמלול מלא"}
-                </button>
-              )}
+              <button
+                onClick={() => setShowTranscript((v) => !v)}
+                className="flex items-center gap-2 pt-1 text-xs font-bold uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
+              >
+                <span className="material-symbols-outlined text-sm">description</span>
+                {showTranscript ? "הסתרת תמלול" : fullClip.transcript ? "תמלול מלא" : "הוספת תמלול"}
+              </button>
               {showTranscript && (
-                <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-surface-container-lowest p-4 text-xs leading-relaxed text-on-surface-variant">
-                  {fullClip.transcript}
-                </p>
+                <div className="space-y-2">
+                  {editingTranscript ? (
+                    <>
+                      <textarea
+                        value={transcriptText}
+                        onChange={(e) => setTranscriptText(e.target.value)}
+                        rows={8}
+                        disabled={saving}
+                        autoFocus
+                        className="w-full rounded border border-outline-variant bg-surface-container-lowest p-4 text-xs leading-relaxed text-on-surface disabled:opacity-60"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={saveTranscript}
+                          disabled={saving}
+                          className="rounded bg-primary px-3 py-1.5 text-[11px] font-bold text-on-primary disabled:opacity-60"
+                        >
+                          {saving ? "שומרת..." : "שמירה"}
+                        </button>
+                        <button
+                          onClick={cancelEditTranscript}
+                          disabled={saving}
+                          className="rounded border border-outline-variant px-3 py-1.5 text-[11px] font-bold text-on-surface-variant disabled:opacity-60"
+                        >
+                          ביטול
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="group relative">
+                      <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-surface-container-lowest p-4 pl-9 text-xs leading-relaxed text-on-surface-variant">
+                        {fullClip.transcript || "אין תמלול זמין"}
+                      </p>
+                      <button
+                        onClick={startEditTranscript}
+                        aria-label="עריכת תמלול"
+                        className="absolute left-2 top-2 text-on-surface-variant/60 hover:text-primary"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
