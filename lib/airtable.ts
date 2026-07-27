@@ -4,6 +4,7 @@ const TABLES = {
   rawClipLibrary: "tbl0JHtFGYG75DVOP",
   contentInventory: "tblNNoQN7kG3mGvhR",
   copies: "tblbRlPLJ8tVpOE70",
+  tasks: "tblLnTfroTGbR1caO",
 } as const;
 
 /** Field IDs, kept explicit so renaming a Hebrew/English label in Airtable never breaks the app. */
@@ -47,6 +48,15 @@ export const FIELDS = {
     copyText: "fldHvbq1jVlkP5cn3",
     platform: "fldGXBQaJN0yHeB5z",
     linkedClip: "fldjYVJd29aZBXcbl",
+  },
+  tasks: {
+    name: "fldJPKQ9wnQZcxy1U",
+    date: "fldHMnNbHIZKUFmv1",
+    cycleType: "fldsXMDFtfnoGreG6",
+    channel: "fldzR7bmpX1PtJwy8",
+    status: "fldfUMyCHtx5fF3du",
+    fullContent: "fldpjcZxZTMf0W9vu",
+    contentInventoryLink: "fld711LOt2iwASJcJ",
   },
 } as const;
 
@@ -105,6 +115,13 @@ export const OPTIONS = {
     { value: "צבעוני", label: "צבעוני", colorHex: null, image: "/צבעוני.png" },
     { value: "דוגמא שחור על חום", label: "דוגמא שחור על חום", colorHex: null, image: "/דוגמא שחור על חום.png" },
     { value: "לבן עם דוגמא", label: "לבן עם דוגמא", colorHex: null, image: "/לבן עם דוגמא.png" },
+  ],
+  taskStatus: [
+    { value: "Not Started", label: "טרם החל" },
+    { value: "In Review", label: "בבדיקה" },
+    { value: "Approved", label: "אושר" },
+    { value: "Cancelled", label: "בוטל" },
+    { value: "Posted/Sent", label: "פורסם" },
   ],
 } as const;
 
@@ -246,6 +263,7 @@ export async function listAllRawClipLibraryRecords(): Promise<
 
 export type ContentInventoryFields = {
   [FIELDS.contentInventory.name]: string;
+  [FIELDS.contentInventory.thumbnail]?: AirtableAttachment[];
   [FIELDS.contentInventory.contentType]?: string;
   [FIELDS.contentInventory.pillar]?: string;
   [FIELDS.contentInventory.hookKeyLine]?: string;
@@ -348,6 +366,50 @@ export async function linkCopyToRawClip(
         fields: { [FIELDS.copies.linkedClip]: next },
         typecast: true,
       }),
+    }
+  );
+}
+
+// ---------- Tasks (Planner) ----------
+
+export type TaskFields = {
+  [FIELDS.tasks.name]: string;
+  [FIELDS.tasks.date]?: string;
+  [FIELDS.tasks.cycleType]?: string;
+  [FIELDS.tasks.channel]?: string;
+  [FIELDS.tasks.status]?: string;
+  [FIELDS.tasks.fullContent]?: string;
+  [FIELDS.tasks.contentInventoryLink]?: string[];
+};
+
+/** All Tasks records — data volume is a handful per week, so client-side week-filtering is simpler than a formula-based date-range query. Paginates past Airtable's 100-per-page limit. */
+export async function listAllTasks(): Promise<AirtableRecord<TaskFields>[]> {
+  const all: AirtableRecord<TaskFields>[] = [];
+  let offset: string | undefined;
+  do {
+    const params = [withFieldIdParams(["pageSize=100"])];
+    if (offset) params.push(`offset=${offset}`);
+    const res = await airtableFetch<{
+      records: AirtableRecord<TaskFields>[];
+      offset?: string;
+    }>(TABLES.tasks, `?${params.join("&")}`);
+    all.push(...res.records);
+    offset = res.offset;
+  } while (offset);
+  return all;
+}
+
+/** The only write path from the Planner UI — everything else on a Task is set by the marketing agent and stays read-only here. */
+export async function updateTaskStatus(
+  recordId: string,
+  status: string
+): Promise<AirtableRecord<TaskFields>> {
+  return airtableFetch<AirtableRecord<TaskFields>>(
+    TABLES.tasks,
+    `/${recordId}?${withFieldIdParams()}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ fields: { [FIELDS.tasks.status]: status }, typecast: true }),
     }
   );
 }
