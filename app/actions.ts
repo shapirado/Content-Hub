@@ -37,9 +37,11 @@ import {
   getRawClipLibraryRecord,
   linkCopyToRawClip,
   listAllRawClipLibraryRecords,
+  listAllTasks,
   searchCopies,
   searchRawClipLibrary,
   updateRawClipLibraryRecord,
+  updateTaskStatus,
 } from "@/lib/airtable";
 
 async function requireSession() {
@@ -416,4 +418,59 @@ export async function mergeRawClipRecordsAction(
 export async function exportClipsAction(clipIds: string[]): Promise<ClipExportRow[]> {
   await requireSession();
   return getClipsForExport(clipIds);
+}
+
+export type PlannerTask = {
+  id: string;
+  name: string;
+  date: string | null;
+  channel: string | null;
+  status: string | null;
+  fullContent: string | null;
+  thumbnailUrl: string | null;
+};
+
+/** All Tasks for the Planner page. TikTok-channel tasks get a thumbnail resolved from their linked Content Inventory record — the only card type that shows one, since Instagram/newsletter tasks don't reliably have a Content Inventory link yet. */
+export async function listTasksAction(): Promise<PlannerTask[]> {
+  await requireSession();
+  const tasks = await listAllTasks();
+
+  const tikTokContentInventoryIds = [
+    ...new Set(
+      tasks
+        .filter((t) => t.fields[FIELDS.tasks.channel] === "TikTok")
+        .flatMap((t) => t.fields[FIELDS.tasks.contentInventoryLink] ?? [])
+    ),
+  ];
+  const contentInventoryRecords = await getContentInventoryRecords(tikTokContentInventoryIds);
+  const thumbnailByContentInventoryId = new Map(
+    contentInventoryRecords.map((r) => [
+      r.id,
+      r.fields[FIELDS.contentInventory.thumbnail]?.[0]?.thumbnails?.small?.url ??
+        r.fields[FIELDS.contentInventory.thumbnail]?.[0]?.url ??
+        null,
+    ])
+  );
+
+  return tasks.map((t) => {
+    const linkedContentInventoryId = t.fields[FIELDS.tasks.contentInventoryLink]?.[0];
+    return {
+      id: t.id,
+      name: t.fields[FIELDS.tasks.name],
+      date: t.fields[FIELDS.tasks.date] ?? null,
+      channel: t.fields[FIELDS.tasks.channel] ?? null,
+      status: t.fields[FIELDS.tasks.status] ?? null,
+      fullContent: t.fields[FIELDS.tasks.fullContent] ?? null,
+      thumbnailUrl: linkedContentInventoryId
+        ? (thumbnailByContentInventoryId.get(linkedContentInventoryId) ?? null)
+        : null,
+    };
+  });
+}
+
+/** The only write path from the Planner UI. Returns the new status so the caller can update local state without refetching. */
+export async function updateTaskStatusAction(taskId: string, status: string): Promise<string | null> {
+  await requireSession();
+  const updated = await updateTaskStatus(taskId, status);
+  return updated.fields[FIELDS.tasks.status] ?? null;
 }
