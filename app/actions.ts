@@ -461,7 +461,7 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       channel: t.fields[FIELDS.tasks.channel] ?? null,
       status: t.fields[FIELDS.tasks.status] ?? null,
       fullContent: t.fields[FIELDS.tasks.fullContent] ?? null,
-      thumbnailUrl: linkedContentInventoryId
+      thumbnailUrl: t.fields[FIELDS.tasks.channel] === "TikTok" && linkedContentInventoryId
         ? (thumbnailByContentInventoryId.get(linkedContentInventoryId) ?? null)
         : null,
     };
