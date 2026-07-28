@@ -468,9 +468,9 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
   });
 }
 
-/** The only write path from the Planner UI. Returns the new status so the caller can update local state without refetching. */
-export async function updateTaskStatusAction(taskId: string, status: string): Promise<string | null> {
+/** The only write path from the Planner UI. Returns the status it just set — no need to round-trip it through Airtable's response, since a non-throwing PATCH already confirms the write. */
+export async function updateTaskStatusAction(taskId: string, status: string): Promise<string> {
   await requireSession();
-  const updated = await updateTaskStatus(taskId, status);
-  return updated.fields[FIELDS.tasks.status] ?? null;
+  await updateTaskStatus(taskId, status);
+  return status;
 }
