@@ -196,6 +196,16 @@ export async function getClipDetails(id: string): Promise<ClipDetails | null> {
   return rows[0] ?? null;
 }
 
+/** Thumbnails for a batch of clip_details rows, keyed by id — resolves Planner task thumbnails for clip-sourced tasks (Airtable Tasks."Clip Source ID"), so a task's thumbnail always reflects the real analyzed clip instead of requiring a separate Airtable attachment upload. */
+export async function getClipThumbnails(clipDetIds: string[]): Promise<Record<string, string | null>> {
+  if (clipDetIds.length === 0) return {};
+  const client = sql();
+  const rows = (await client`
+    select id, thumbnail from clip_details where id = ANY(${clipDetIds})
+  `) as unknown as { id: string; thumbnail: string | null }[];
+  return Object.fromEntries(rows.map((r) => [r.id, r.thumbnail]));
+}
+
 /** All physical copies (Drive file / YouTube upload / ...) of a logical clip. */
 export async function listClipCopies(clipDetId: string): Promise<ClipCopy[]> {
   const client = sql();

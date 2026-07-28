@@ -57,6 +57,10 @@ export const FIELDS = {
     status: "fldfUMyCHtx5fF3du",
     fullContent: "fldpjcZxZTMf0W9vu",
     contentInventoryLink: "fld711LOt2iwASJcJ",
+    /** Neon clip_details.id (UUID) this task was built from. When set, the thumbnail/link live in Neon, not Airtable. */
+    clipSourceId: "fldy6KXFQtcvaw2A9",
+    /** Only populated for non-clip-sourced tasks (e.g. a Canva carousel slide) — clip-sourced tasks resolve their thumbnail via clipSourceId instead. */
+    thumbnail: "fldNKroxxhyipT9rM",
   },
 } as const;
 
@@ -380,6 +384,8 @@ export type TaskFields = {
   [FIELDS.tasks.status]?: string;
   [FIELDS.tasks.fullContent]?: string;
   [FIELDS.tasks.contentInventoryLink]?: string[];
+  [FIELDS.tasks.clipSourceId]?: string;
+  [FIELDS.tasks.thumbnail]?: AirtableAttachment[];
 };
 
 /** All Tasks records — data volume is a handful per week, so client-side week-filtering is simpler than a formula-based date-range query. Paginates past Airtable's 100-per-page limit. */

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import {
   getClipDetails,
   getClipLibraryRow,
+  getClipThumbnails,
   listClipIdsForRawClipId,
   repointRawClipId,
   upsertClipLibraryRow,
@@ -431,29 +432,33 @@ export type PlannerTask = {
 };
 
 /** All Tasks for the Planner page. TikTok-channel tasks get a thumbnail resolved from their linked Content Inventory record — the only card type that shows one, since Instagram/newsletter tasks don't reliably have a Content Inventory link yet. */
+/**
+ * A task is either clip-sourced (its "Clip Source ID" holds the Neon clip_details.id it was
+ * built from — the thumbnail lives in Neon, populated by the AI analysis pipeline for nearly
+ * every clip) or not (a Canva-exported carousel slide, etc. — its own Airtable "Thumbnail"
+ * attachment is the only source). This resolves whichever applies, for every task regardless
+ * of channel — not just TikTok.
+ */
 export async function listTasksAction(): Promise<PlannerTask[]> {
   await requireSession();
   const tasks = await listAllTasks();
 
-  const tikTokContentInventoryIds = [
+  const clipSourceIds = [
     ...new Set(
       tasks
-        .filter((t) => t.fields[FIELDS.tasks.channel] === "TikTok")
-        .flatMap((t) => t.fields[FIELDS.tasks.contentInventoryLink] ?? [])
+        .map((t) => t.fields[FIELDS.tasks.clipSourceId])
+        .filter((id): id is string => !!id)
     ),
   ];
-  const contentInventoryRecords = await getContentInventoryRecords(tikTokContentInventoryIds);
-  const thumbnailByContentInventoryId = new Map(
-    contentInventoryRecords.map((r) => [
-      r.id,
-      r.fields[FIELDS.contentInventory.thumbnail]?.[0]?.thumbnails?.small?.url ??
-        r.fields[FIELDS.contentInventory.thumbnail]?.[0]?.url ??
-        null,
-    ])
-  );
+  const clipThumbnails = await getClipThumbnails(clipSourceIds);
 
   return tasks.map((t) => {
-    const linkedContentInventoryId = t.fields[FIELDS.tasks.contentInventoryLink]?.[0];
+    const clipSourceId = t.fields[FIELDS.tasks.clipSourceId];
+    const thumbnailUrl =
+      (clipSourceId ? clipThumbnails[clipSourceId] : null) ??
+      t.fields[FIELDS.tasks.thumbnail]?.[0]?.thumbnails?.small?.url ??
+      t.fields[FIELDS.tasks.thumbnail]?.[0]?.url ??
+      null;
     return {
       id: t.id,
       name: t.fields[FIELDS.tasks.name],
@@ -461,9 +466,7 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       channel: t.fields[FIELDS.tasks.channel] ?? null,
       status: t.fields[FIELDS.tasks.status] ?? null,
       fullContent: t.fields[FIELDS.tasks.fullContent] ?? null,
-      thumbnailUrl: t.fields[FIELDS.tasks.channel] === "TikTok" && linkedContentInventoryId
-        ? (thumbnailByContentInventoryId.get(linkedContentInventoryId) ?? null)
-        : null,
+      thumbnailUrl,
     };
   });
 }
