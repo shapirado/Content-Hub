@@ -96,7 +96,7 @@ function ExpandableContent({ text }: { text: string | null }) {
           onClick={() => setExpanded((v) => !v)}
           className="mt-1 text-xs font-bold text-primary hover:underline"
         >
-          {expanded ? "הצג פחות" : "הצג עוד"}
+          {expanded ? "הציגי פחות" : "הציגי עוד"}
         </button>
       )}
     </div>
@@ -140,151 +140,171 @@ export function PlannerCalendar({
     (t) => !["TikTok", "Instagram", "Rav-Masar"].includes(t.channel ?? "")
   );
 
+  const hasInstagram = instagramTasks.length > 0;
+  const hasTikTok = tikTokTasks.length > 0;
+  const hasNewsletter = newsletterTasks.length > 0;
+
   return (
     <div className="space-y-8">
-      <section className="rounded-[32px] border border-outline-variant bg-surface-container-lowest p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-5">
-            <h2 className="text-headline-sm font-headline-sm text-on-surface">לוח זמנים שבועי</h2>
-            <div className="flex rounded-full bg-surface-container-low p-1">
-              <span className="rounded-full bg-surface-container-lowest px-4 py-1 text-xs font-bold text-primary shadow-sm">
-                שבועי
-              </span>
-              <span
-                className="cursor-not-allowed rounded-full px-4 py-1 text-xs text-on-surface-variant/50"
-                title="תצוגה חודשית תתווסף בהמשך"
+      <div className="grid grid-cols-12 gap-8">
+        <section
+          className={`col-span-12 rounded-[32px] border border-outline-variant bg-surface-container-lowest p-6 ${hasInstagram ? "lg:col-span-8" : ""}`}
+        >
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center gap-5">
+              <h2 className="text-headline-sm font-headline-sm text-on-surface">לוח זמנים שבועי</h2>
+              <div className="flex rounded-full bg-surface-container-low p-1">
+                <span className="rounded-full bg-surface-container-lowest px-4 py-1 text-xs font-bold text-primary shadow-sm">
+                  שבועי
+                </span>
+                <span
+                  className="cursor-not-allowed rounded-full px-4 py-1 text-xs text-on-surface-variant/50"
+                  title="תצוגה חודשית תתווסף בהמשך"
+                >
+                  חודשי
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setWeekStart((w) => addDays(w, -7))}
+                className="rounded-full p-1.5 text-on-surface-variant hover:bg-surface-container-high"
+                aria-label="שבוע קודם"
               >
-                חודשי
-              </span>
+                <span className="material-symbols-outlined">chevron_right</span>
+              </button>
+              <button
+                onClick={() => setWeekStart(startOfWeek(new Date()))}
+                className="rounded-full border border-outline-variant px-3 py-1 text-xs font-bold text-on-surface-variant hover:text-on-surface"
+              >
+                היום
+              </button>
+              <span className="text-sm text-on-surface-variant">{formatWeekRangeLabel(weekStart)}</span>
+              <button
+                onClick={() => setWeekStart((w) => addDays(w, 7))}
+                className="rounded-full p-1.5 text-on-surface-variant hover:bg-surface-container-high"
+                aria-label="שבוע הבא"
+              >
+                <span className="material-symbols-outlined">chevron_left</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setWeekStart((w) => addDays(w, -7))}
-              className="rounded-full p-1.5 text-on-surface-variant hover:bg-surface-container-high"
-              aria-label="שבוע קודם"
-            >
-              <span className="material-symbols-outlined">chevron_right</span>
-            </button>
-            <button
-              onClick={() => setWeekStart(startOfWeek(new Date()))}
-              className="rounded-full border border-outline-variant px-3 py-1 text-xs font-bold text-on-surface-variant hover:text-on-surface"
-            >
-              היום
-            </button>
-            <span className="text-sm text-on-surface-variant">{formatWeekRangeLabel(weekStart)}</span>
-            <button
-              onClick={() => setWeekStart((w) => addDays(w, 7))}
-              className="rounded-full p-1.5 text-on-surface-variant hover:bg-surface-container-high"
-              aria-label="שבוע הבא"
-            >
-              <span className="material-symbols-outlined">chevron_left</span>
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-7 gap-2">
-          {days.map((day, i) => {
-            const dateKey = toDateKey(day);
-            const dayTasks = weekTasks.filter((t) => t.date === dateKey);
-            return (
-              <div key={dateKey} className="rounded-2xl bg-surface-container-low p-2.5">
-                <div className="mb-1 text-[10px] text-on-surface-variant/60">{DAY_LABELS[i]}</div>
-                <div className="mb-2 text-sm font-bold text-on-surface">{day.getDate()}</div>
-                {dayTasks.map((t) => (
-                  <div
-                    key={t.id}
-                    className="mb-1 truncate rounded bg-primary-container px-1.5 py-1 text-[10px] text-on-primary-container"
-                    title={t.name}
-                  >
-                    {t.name}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {tikTokTasks.length > 0 && (
-        <section className="rounded-[32px] bg-surface-container-highest p-6">
-          <div className="mb-5 flex items-center gap-2.5">
-            <TikTokIcon className="h-6 w-6 text-primary" />
-            <h3 className="text-headline-sm font-headline-sm text-on-surface">לוח שידורים טיקטוק</h3>
-          </div>
-          <div className="space-y-3">
-            {tikTokTasks.map((t) => (
-              <div key={t.id} className="flex gap-4 rounded-2xl bg-surface-container-lowest p-5">
-                {t.thumbnailUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={t.thumbnailUrl}
-                    alt={t.name}
-                    className="h-20 w-14 shrink-0 rounded-lg object-cover"
-                  />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <span className="text-sm font-bold text-primary">{t.name}</span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-[11px] text-on-surface-variant">
-                        {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
-                      </span>
-                      <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
+          <div className="grid grid-cols-7 gap-2">
+            {days.map((day, i) => {
+              const dateKey = toDateKey(day);
+              const dayTasks = weekTasks.filter((t) => t.date === dateKey);
+              return (
+                <div key={dateKey} className="rounded-2xl bg-surface-container-low p-2.5">
+                  <div className="mb-1 text-[10px] text-on-surface-variant/60">{DAY_LABELS[i]}</div>
+                  <div className="mb-2 text-sm font-bold text-on-surface">{day.getDate()}</div>
+                  {dayTasks.map((t) => (
+                    <div
+                      key={t.id}
+                      className="mb-1 truncate rounded bg-primary-container px-1.5 py-1 text-[10px] text-on-primary-container"
+                      title={t.name}
+                    >
+                      {t.name}
                     </div>
-                  </div>
-                  <ExpandableContent text={t.fullContent} />
+                  ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
-      )}
 
-      {instagramTasks.length > 0 && (
-        <section className="space-y-3">
-          {instagramTasks.map((t) => (
-            <div key={t.id} className="rounded-[32px] border border-outline-variant bg-surface-container-lowest p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <InstagramIcon className="h-6 w-6 text-primary" />
-                  <h3 className="text-headline-sm font-headline-sm text-on-surface">{t.name}</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-on-surface-variant">
-                    {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
-                  </span>
-                  <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
-                </div>
-              </div>
-              <ExpandableContent text={t.fullContent} />
-            </div>
-          ))}
-        </section>
-      )}
-
-      {newsletterTasks.length > 0 && (
-        <section className="rounded-[32px] bg-surface-container p-6">
-          <div className="mb-5 flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-2xl text-primary">mail</span>
-            <h3 className="text-headline-sm font-headline-sm text-on-surface">ניוזלטר</h3>
-          </div>
-          <div className="space-y-3">
-            {newsletterTasks.map((t) => (
-              <div key={t.id} className="rounded-[24px] bg-surface-container-lowest p-6">
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div>
-                    <span className="text-xs font-bold text-primary">
-                      {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
-                    </span>
-                    <h4 className="mt-0.5 text-base font-bold text-on-surface">{t.name}</h4>
+        {hasInstagram && (
+          <section className="col-span-12 space-y-3 lg:col-span-4">
+            {instagramTasks.map((t) => (
+              <div key={t.id} className="rounded-[32px] border border-outline-variant bg-surface-container-lowest p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <InstagramIcon className="h-6 w-6 text-primary" />
+                    <h3 className="text-headline-sm font-headline-sm text-on-surface">{t.name}</h3>
                   </div>
                   <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                 </div>
+                <span className="mb-3 block text-[11px] text-on-surface-variant">
+                  {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                </span>
                 <ExpandableContent text={t.fullContent} />
               </div>
             ))}
-          </div>
-        </section>
+          </section>
+        )}
+      </div>
+
+      {(hasTikTok || hasNewsletter) && (
+        <div className="grid grid-cols-12 gap-8">
+          {hasTikTok && (
+            <section
+              className={`col-span-12 rounded-[32px] bg-surface-container-highest p-6 ${hasNewsletter ? "lg:col-span-6" : ""}`}
+            >
+              <div className="mb-5 flex items-center gap-2.5">
+                <TikTokIcon className="h-6 w-6 text-primary" />
+                <h3 className="text-headline-sm font-headline-sm text-on-surface">לוח שידורים טיקטוק</h3>
+              </div>
+              <div className="space-y-3">
+                {tikTokTasks.map((t) => (
+                  <div key={t.id} className="flex gap-4 rounded-2xl bg-surface-container-lowest p-5">
+                    <div className="flex h-20 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-high">
+                      {t.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={t.thumbnailUrl}
+                          alt={t.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="material-symbols-outlined text-xl text-on-surface-variant/40">
+                          movie
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <span className="text-sm font-bold text-primary">{t.name}</span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <span className="text-[11px] text-on-surface-variant">
+                            {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                          </span>
+                          <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
+                        </div>
+                      </div>
+                      <ExpandableContent text={t.fullContent} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {hasNewsletter && (
+            <section
+              className={`col-span-12 rounded-[32px] bg-surface-container p-6 ${hasTikTok ? "lg:col-span-6" : ""}`}
+            >
+              <div className="mb-5 flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-2xl text-primary">mail</span>
+                <h3 className="text-headline-sm font-headline-sm text-on-surface">ניוזלטר</h3>
+              </div>
+              <div className="space-y-3">
+                {newsletterTasks.map((t) => (
+                  <div key={t.id} className="rounded-[24px] bg-surface-container-lowest p-6">
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-primary">
+                          {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                        </span>
+                        <h4 className="mt-0.5 text-base font-bold text-on-surface">{t.name}</h4>
+                      </div>
+                      <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
+                    </div>
+                    <ExpandableContent text={t.fullContent} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
 
       {otherTasks.length > 0 && (
