@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html class="light" dir="rtl" lang="he"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CreatorHub | Marketing Operations</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200;300;400;500;600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#FFDEA5",
+                        "error-container": "#ffdad6",
+                        "surface-container": "#f6ece4",
+                        "outline-variant": "#d1c5b4",
+                        "secondary-fixed-dim": "#c8c6c2",
+                        "tertiary-container": "#aba4a0",
+                        "primary-fixed": "#ffdea5",
+                        "secondary-container": "#e5e2dd",
+                        "on-secondary": "#ffffff",
+                        "surface-tint": "#775a19",
+                        "error": "#ba1a1a",
+                        "on-secondary-container": "#656461",
+                        "surface-dim": "#e1d8d0",
+                        "on-primary-container": "#4e3700",
+                        "on-tertiary-fixed": "#1e1b18",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#474743",
+                        "surface-variant": "#eae1d9",
+                        "surface-container-low": "#fcf2ea",
+                        "on-secondary-fixed": "#1c1c19",
+                        "on-tertiary-container": "#3f3a37",
+                        "on-surface": "#1f1b16",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#1f1b16",
+                        "on-error-container": "#93000a",
+                        "inverse-on-surface": "#f9efe7",
+                        "background": "#fff8f3",
+                        "surface-container-highest": "#eae1d9",
+                        "tertiary-fixed-dim": "#cdc5c0",
+                        "on-primary-fixed-variant": "#5d4201",
+                        "tertiary": "#635d5a",
+                        "on-tertiary-fixed-variant": "#4b4642",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#e9c176",
+                        "on-surface-variant": "#4e4639",
+                        "surface": "#fff8f3",
+                        "outline": "#7f7667",
+                        "tertiary-fixed": "#e9e1dc",
+                        "primary": "#775a19",
+                        "surface-bright": "#fff8f3",
+                        "secondary-fixed": "#e5e2dd",
+                        "primary-fixed-dim": "#e9c176",
+                        "secondary": "#5f5e5b",
+                        "inverse-surface": "#34302a",
+                        "surface-container-high": "#f0e7de",
+                        "on-primary-fixed": "#261900"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "margin-desktop": "64px",
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "lg": "48px",
+                        "margin-mobile": "16px",
+                        "xl": "80px",
+                        "base": "8px",
+                        "sm": "12px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Assistant"],
+                        "body-lg": ["Assistant"],
+                        "caption": ["Assistant"],
+                        "headline-sm": ["Assistant"],
+                        "headline-lg-mobile": ["Assistant"],
+                        "body-md": ["Assistant"],
+                        "label-md": ["Assistant"],
+                        "headline-lg": ["Assistant"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["32px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "caption": ["12px", {"lineHeight": "1.4", "fontWeight": "400"}],
+                        "headline-sm": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "1", "fontWeight": "600"}],
+                        "headline-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Assistant', sans-serif;
+            background-color: #fff8f3;
+            color: #1f1b16;
+        }
+        .glass-panel {
+            background: rgba(249, 246, 241, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(127, 118, 103, 0.1);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #d1c5b4;
+            border-radius: 10px;
+        }
+        .bento-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+    </style>
+</head>
+<body class="bg-background">
+<!-- Sidebar Shell (Flipped to Right) -->
+<aside class="h-screen w-64 fixed right-0 top-0 bg-surface dark:bg-surface-dim shadow-sm flex flex-col py-gutter-md px-gutter-sm z-50">
+<div class="px-6 py-8 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim text-right">CreatorHub</h1>
+<p class="font-label-md text-label-md text-on-surface-variant opacity-70 text-right">Solo Edition</p>
+</div>
+<nav class="flex-1 space-y-1 px-4">
+<a class="flex items-center space-x-3 space-x-reverse px-4 py-3 text-on-surface-variant dark:text-outline hover:text-primary hover:bg-surface-container-low transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined">photo_library</span>
+<span class="font-label-md text-label-md">ספריית מדיה</span>
+</a>
+<a class="flex items-center space-x-3 space-x-reverse px-4 py-3 text-on-surface-variant dark:text-outline hover:text-primary hover:bg-surface-container-low transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined">insert_chart</span>
+<span class="font-label-md text-label-md">אנליטיקה</span>
+</a>
+<a class="flex items-center space-x-3 space-x-reverse px-4 py-3 text-primary dark:text-primary-fixed-dim font-bold border-l-4 border-primary bg-surface-container-low transition-colors rounded-xl" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-label-md text-label-md">יומן פעילות</span>
+</a>
+<a class="flex items-center space-x-3 space-x-reverse px-4 py-3 text-on-surface-variant dark:text-outline hover:text-primary hover:bg-surface-container-low transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined">sync</span>
+<span class="font-label-md text-label-md">אינטגרציות</span>
+</a>
+<a class="flex items-center space-x-3 space-x-reverse px-4 py-3 text-on-surface-variant dark:text-outline hover:text-primary hover:bg-surface-container-low transition-colors rounded-xl group" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">הגדרות</span>
+</a>
+</nav>
+<div class="p-4">
+<button class="w-full py-4 bg-primary text-on-primary font-label-md text-label-md rounded-full shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                יצירת פוסט חדש
+            </button>
+</div>
+</aside>
+<!-- Header Shell (Flipped margin) -->
+<header class="fixed top-0 left-0 right-64 h-16 bg-surface-bright dark:bg-surface-container-lowest shadow-sm flex justify-between items-center px-gutter-md z-40">
+<div class="flex items-center flex-1 max-w-xl">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full pr-10 pl-4 py-2 bg-surface-container rounded-full border-none focus:ring-2 focus:ring-primary-container text-body-md font-body-md placeholder-outline text-right" placeholder="חפש קמפיינים או תוכן..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:bg-surface-container dark:hover:bg-surface-container-high rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hover:bg-surface-container dark:hover:bg-surface-container-high rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="h-10 w-10 rounded-full overflow-hidden border-2 border-surface-container-high">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a young female content creator in a sun-drenched minimalist studio. The lighting is soft and golden, reflecting the Sahara theme's warmth. She wears neutral-toned linen clothing, embodying a clean and sophisticated brand identity. The background is softly blurred, highlighting her friendly yet professional expression." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtm8E3gRiQ8huUnSsN8AVOAa3l04uwB_MRwgxJMYxwt0WM3SOr30xbSN-fo5ewgKtR6wOKj-DiKnGf5z4OjCar3n0PdMAyoD8FjLbXB-8W-sqfdCsjAZ-v1_vgfNQjVir7Y7CW0sGoakx2KAa1c2OfurqfISQ1jCOKRZyJHcmWhYnBjmzhiQJCIujZHa8z1kVeDy5lW75JZr6NK5pjwhn2bWPg2C5_kIYYYSAvl3DVDs1GjaSCsX0EinhVHdgdnjx51YT0c02VwxTn"/>
+</div>
+</div>
+</header>
+<!-- Main Content Area (Flipped margin) -->
+<main class="mr-64 mt-16 p-gutter min-h-screen">
+<div class="max-w-[1440px] mx-auto py-10 px-8">
+<!-- Page Heading -->
+<div class="flex flex-col mb-12 text-right">
+<h2 class="font-headline-lg text-headline-lg text-primary mb-2">מרכז התפעול השיווקי</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">לוח הבקרה המרכזי לתזמון וניהול תוכן. כאן תוכלו לתכנן את הנוכחות הדיגיטלית שלכם בדיוק ובסטייל.</p>
+</div>
+<!-- Bento Layout -->
+<div class="bento-grid">
+<!-- Calendar View (Large Column) -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-[32px] p-8 border border-outline-variant border-opacity-20 shadow-sm overflow-hidden">
+<div class="flex justify-between items-center mb-8">
+<div class="flex items-center gap-6">
+<h3 class="font-headline-sm text-headline-sm">לוח זמנים שבועי</h3>
+<div class="flex bg-surface-container rounded-full p-1">
+<button class="px-6 py-1.5 rounded-full bg-white text-primary shadow-sm font-label-md text-label-md">שבועי</button>
+<button class="px-6 py-1.5 rounded-full text-on-surface-variant font-label-md text-label-md">חודשי</button>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 hover:bg-surface-container rounded-full transition-colors"><span class="material-symbols-outlined">chevron_right</span></button>
+<span class="font-label-md text-label-md">אוקטובר 2023</span>
+<button class="p-2 hover:bg-surface-container rounded-full transition-colors"><span class="material-symbols-outlined">chevron_left</span></button>
+</div>
+</div>
+<div class="grid grid-cols-7 gap-4">
+<!-- Days Header (Reversed order in grid for RTL logic if needed, but Tailwind grid-cols-7 with dir=rtl handles it) -->
+<div class="text-center font-label-md text-label-md text-outline py-2">ראשון</div>
+<div class="text-center font-label-md text-label-md text-outline py-2">שני</div>
+<div class="text-center font-label-md text-label-md text-outline py-2">שלישי</div>
+<div class="text-center font-label-md text-label-md text-outline py-2">רביעי</div>
+<div class="text-center font-label-md text-label-md text-outline py-2">חמישי</div>
+<div class="text-center font-label-md text-label-md text-outline py-2">שישי</div>
+<div class="text-center font-label-md text-label-md text-outline py-2">שבת</div>
+<!-- Empty/Prev Days -->
+<div class="h-32 bg-surface-container-low rounded-2xl opacity-40"></div>
+<div class="h-32 bg-surface-container-low rounded-2xl opacity-40"></div>
+<!-- Current Days with Content -->
+<div class="h-32 bg-surface-container-low rounded-2xl p-3 border border-primary-container border-opacity-10 relative group">
+<div class="text-primary font-bold mb-2 text-right">01</div>
+<div class="bg-primary-fixed text-on-primary-fixed p-1 rounded text-[10px] truncate mb-1 text-right">TikTok: Behind Scenes</div>
+</div>
+<div class="h-32 bg-surface-container-low rounded-2xl p-3 border border-transparent">
+<div class="text-outline font-bold mb-2 text-right">02</div>
+</div>
+<div class="h-32 bg-surface-container-low rounded-2xl p-3 border border-transparent">
+<div class="text-outline font-bold mb-2 text-right">03</div>
+<div class="bg-secondary-container text-on-secondary-container p-1 rounded text-[10px] truncate mb-1 text-right">Newsletter Blast</div>
+</div>
+<div class="h-32 bg-surface-container-low rounded-2xl p-3 border border-transparent">
+<div class="text-outline font-bold mb-2 text-right">04</div>
+</div>
+<div class="h-32 bg-surface-container-low rounded-2xl p-3 border border-transparent">
+<div class="text-outline font-bold mb-2 text-right">05</div>
+<div class="bg-tertiary-container text-on-tertiary-container p-1 rounded text-[10px] truncate mb-1 text-right">IG: Sahara Vibes</div>
+</div>
+</div>
+</div>
+<!-- Instagram Focus (Right Column becomes Left Column in RTL) -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<div class="bg-surface-container-lowest rounded-[32px] p-6 border border-outline-variant border-opacity-20 shadow-sm flex-1 text-right">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-sm text-headline-sm">פוסט אינסטגרם</h3>
+<span class="px-3 py-1 bg-primary-container text-on-primary-container rounded-full text-[12px] font-bold">מתוכנן</span>
+</div>
+<div class="aspect-square rounded-2xl overflow-hidden mb-4 shadow-md bg-surface-variant">
+<img class="w-full h-full object-cover" data-alt="A stunning wide-angle shot of a minimalist desert house at dusk. The architecture features clean lines and large glass windows reflecting a soft orange and purple sunset. Warm glowing lights emanate from within the house, creating a serene, luxurious atmosphere. The sand dunes in the foreground are smooth and perfectly lit by the fading daylight. Sahara minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAL-snkh9Q6IuU_rcu3BLeRBp0zQTJfDXEj9punEqhXy4ubISMqv8C_sVA6a2LEMvIF7LdjGWg6IUsjnRdJ8gag1CJ1cZO01dqKwpTFXDBxf77_9x9s9B2x71DZfBvX1Jmuc-7mSFm3C7bayZm4a6niVV9YUszdNIfuxoNu2lJKLE9UrcjE0LB3Dv8RfdJPZAU60WEFw38tBkKZRgowtX0nQchofd6-U-ZJB11Jm5rvB_KUtG4AfNtLXz30hxhutMlLUGRvtoYJc-83"/>
+</div>
+<div class="space-y-2">
+<p class="font-body-md text-body-md line-clamp-2">"מוצאת שלווה בפשטות של המדבר. קולקציית סהרה מושקת בשבוע הבא..."</p>
+<div class="flex gap-2 justify-start">
+<span class="text-primary font-label-md text-label-md">#Minimalism</span>
+<span class="text-primary font-label-md text-label-md">#SaharaLiving</span>
+</div>
+</div>
+<button class="mt-6 w-full py-3 border border-outline rounded-full font-label-md text-label-md hover:bg-surface-container transition-colors">ערוך טיוטה</button>
+</div>
+</div>
+<!-- TikTok Weekly Schedule -->
+<div class="col-span-12 lg:col-span-6 bg-surface-container-highest rounded-[32px] p-8 border border-outline-variant border-opacity-10 text-right">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary text-3xl">movie_edit</span>
+<h3 class="font-headline-sm text-headline-sm">לוח שידורים טיקטוק</h3>
+</div>
+<div class="space-y-6">
+<!-- Post 1 -->
+<div class="bg-surface-container-lowest p-6 rounded-2xl flex gap-6">
+<div class="flex-1 space-y-3">
+<div class="flex justify-between">
+<h4 class="font-label-md text-label-md text-primary">שם הסרטון: שגרת בוקר</h4>
+<span class="text-caption text-outline">מתוזמן: יום ג' 10:00</span>
+</div>
+<div>
+<span class="text-caption font-bold text-on-surface-variant block mb-1">Hook (משפט פתיחה)</span>
+<p class="text-body-md text-on-surface italic">"הנה איך אני מתחילה את הבוקר שלי במדבר..."</p>
+</div>
+<div>
+<span class="text-caption font-bold text-on-surface-variant block mb-1">Hashtags (תגיות)</span>
+<div class="flex gap-2">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[12px] text-outline">#aesthetic</span>
+<span class="bg-surface-container px-2 py-0.5 rounded text-[12px] text-outline">#lifestyle</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Post 2 -->
+<div class="bg-surface-container-lowest p-6 rounded-2xl flex gap-6">
+<div class="flex-1 space-y-3">
+<div class="flex justify-between">
+<h4 class="font-label-md text-label-md text-primary">שם הסרטון: צבעי המדבר</h4>
+<span class="text-caption text-outline">מתוזמן: יום ה' 18:30</span>
+</div>
+<div>
+<span class="text-caption font-bold text-on-surface-variant block mb-1">Hook (משפט פתיחה)</span>
+<p class="text-body-md text-on-surface italic">"הצבעים ששינו את הדרך בה אני מעצבת..."</p>
+</div>
+<div>
+<span class="text-caption font-bold text-on-surface-variant block mb-1">Hashtags (תגיות)</span>
+<div class="flex gap-2">
+<span class="bg-surface-container px-2 py-0.5 rounded text-[12px] text-outline">#colorpalette</span>
+<span class="bg-surface-container px-2 py-0.5 rounded text-[12px] text-outline">#design</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Biweekly Newsletter -->
+<div class="col-span-12 lg:col-span-6 bg-surface-container rounded-[32px] p-8 border border-outline-variant border-opacity-10 relative overflow-hidden text-right">
+<div class="flex items-center gap-3 mb-8">
+<span class="material-symbols-outlined text-primary text-3xl">mail</span>
+<h3 class="font-headline-sm text-headline-sm">ניוזלטר דו-שבועי</h3>
+</div>
+<div class="space-y-6">
+<div class="bg-surface-container-lowest p-8 rounded-3xl shadow-sm">
+<div class="mb-4">
+<span class="text-caption text-primary font-bold">מהדורה #24</span>
+<h4 class="font-headline-sm text-headline-sm mt-1">נושא: השקט של הדיונות</h4>
+</div>
+<div class="relative mb-6">
+<p class="text-body-md text-on-surface-variant leading-relaxed">
+                                    במהדורה של השבוע אנחנו צוללים לעומק השקט המדברי ואיך הוא משפיע על היצירתיות שלנו. גלו את הסודות לעיצוב מינימליסטי שמרגיש חם ומזמין...
+                                </p>
+<details class="mt-2 group">
+<summary class="list-none text-primary cursor-pointer font-label-md flex items-center gap-1 justify-start">
+<span class="group-open:hidden">קרא עוד</span>
+<span class="hidden group-open:block">הציגי פחות</span>
+<span class="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+</summary>
+<div class="mt-4 pt-4 border-t border-outline-variant border-opacity-20 text-body-md text-on-surface-variant">
+                                        המשך הטקסט המפורט כאן כולל טיפים לסידור חלל העבודה, ראיון עם מעצב פנים מקומי והמלצות על פלייליסטים שמתאימים לעבודה מרוכזת. אנחנו מאמינים שהפחות הוא היותר החדש.
+                                    </div>
+</details>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="space-y-2">
+<span class="text-caption font-bold text-on-surface">Links (קישורים)</span>
+<ul class="text-label-md text-primary space-y-1">
+<li class="flex items-center gap-2 cursor-pointer hover:underline"><span class="material-symbols-outlined text-[16px]">link</span> רכשו את הקולקציה</li>
+<li class="flex items-center gap-2 cursor-pointer hover:underline"><span class="material-symbols-outlined text-[16px]">link</span> פוסט חדש בבלוג</li>
+</ul>
+</div>
+<div class="space-y-2">
+<span class="text-caption font-bold text-on-surface">Related Events (אירועים)</span>
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-full text-caption">
+<span class="material-symbols-outlined text-[16px]">event</span> וובינר עיצוב - 12 באוק'
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action for Quick Add (Contextual - Flipped to Left) -->
+<button class="fixed bottom-10 left-10 h-16 w-16 bg-primary text-on-primary rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform hover:rotate-90 z-50" id="quick-add">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+<script>
+        // Micro-interactions
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('mousedown', () => {
+                el.classList.add('scale-95');
+            });
+            el.addEventListener('mouseup', () => {
+                el.classList.remove('scale-95');
+            });
+            el.addEventListener('mouseleave', () => {
+                el.classList.remove('scale-95');
+            });
+        });
+
+        // Simple visibility observer for scroll reveal effects
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-4');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.bento-grid > div').forEach(card => {
+            card.classList.add('transition-all', 'duration-700', 'opacity-0', 'translate-y-4');
+            observer.observe(card);
+        });
+    </script>
+</body></html>

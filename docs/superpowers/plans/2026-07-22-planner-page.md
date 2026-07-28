@@ -534,7 +534,7 @@ function ExpandableContent({ text }: { text: string | null }) {
           onClick={() => setExpanded((v) => !v)}
           className="mt-1 text-xs font-bold text-primary hover:underline"
         >
-          {expanded ? "הצג פחות" : "הצג עוד"}
+          {expanded ? "הציגי פחות" : "הציגי עוד"}
         </button>
       )}
     </div>
@@ -780,7 +780,7 @@ Start the dev server (ask before touching port 3000 if something else is already
 1. Navigate to `/`, click "לוח שנה" in the sidebar — confirm it navigates to `/planner` and highlights as active (no longer shows "בקרוב").
 2. On `/planner`, confirm the current week's real Tasks render. As of this plan's writing there are 4 real Tasks (two TikTok, one Instagram, one Newsletter) — depending on today's date they may or may not fall in the default (current) week; use the prev/next week arrows and confirm they eventually appear, each under the right card group with the right channel icon.
 3. Confirm the two TikTok cards show a thumbnail image (pulled from their linked Content Inventory record) — if a given task has no linked Content Inventory record or that record has no thumbnail attachment, confirm the card still renders correctly without one (no broken image, no layout break).
-4. Click "הצג עוד" on a Full Content preview; confirm it expands to the complete text, and "הצג פחות" collapses it back.
+4. Click "הציגי עוד" on a Full Content preview; confirm it expands to the complete text, and "הציגי פחות" collapses it back.
 5. Click a status pill; confirm it cycles to the next status, the color changes accordingly, and reloading the page shows the change persisted (check it lands correctly in Airtable too, via the Airtable UI or an MCP `list_records_for_table` call).
 6. Cycle a status all the way to "Cancelled" specifically — confirm this works, proving the user's manually-added Airtable choice matches the value this code sends (`"Cancelled"` exactly). If it 422s or silently fails to stick, the Airtable choice name doesn't match — surface this to the user rather than guessing at a fix.
 7. Click "היום" after navigating away; confirm it returns to the current week.
