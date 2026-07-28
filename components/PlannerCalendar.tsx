@@ -103,9 +103,15 @@ function ExpandableContent({ text }: { text: string | null }) {
   );
 }
 
-export function PlannerCalendar({ initialTasks }: { initialTasks: PlannerTask[] }) {
+export function PlannerCalendar({
+  initialTasks,
+  initialWeekStartKey,
+}: {
+  initialTasks: PlannerTask[];
+  initialWeekStartKey: string;
+}) {
   const [tasks, setTasks] = useState(initialTasks);
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const [weekStart, setWeekStart] = useState(() => parseDateKey(initialWeekStartKey));
   const [saving, startSaving] = useTransition();
 
   const weekTasks = useMemo(() => {
