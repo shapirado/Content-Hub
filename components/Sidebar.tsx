@@ -3,7 +3,6 @@ import { auth, signOut } from "@/auth";
 
 const STUBBED_NAV = [
   { icon: "insert_chart", label: "אנליטיקה" },
-  { icon: "calendar_month", label: "לוח שנה" },
   { icon: "sync", label: "אינטגרציות" },
   { icon: "settings", label: "הגדרות" },
 ];
@@ -11,7 +10,7 @@ const STUBBED_NAV = [
 export async function Sidebar({
   active = "library",
 }: {
-  active?: "library" | "rawClips";
+  active?: "library" | "rawClips" | "planner";
 }) {
   const session = await auth();
 
@@ -46,6 +45,17 @@ export async function Sidebar({
         >
           <span className="material-symbols-outlined">content_copy</span>
           <span className="text-sm">איתור כפילויות</span>
+        </Link>
+        <Link
+          className={
+            active === "planner"
+              ? "flex items-center gap-3 rounded bg-primary/10 px-4 py-3 font-bold text-primary transition-colors"
+              : "flex items-center gap-3 rounded px-4 py-3 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
+          }
+          href="/planner"
+        >
+          <span className="material-symbols-outlined">calendar_month</span>
+          <span className="text-sm">לוח שנה</span>
         </Link>
         {STUBBED_NAV.map((item) => (
           <span
