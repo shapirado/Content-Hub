@@ -6,6 +6,7 @@ import {
   getClipLibraryRow,
   getClipRepresentativeLinks,
   getClipThumbnails,
+  getClipTranscripts,
   listClipIdsForRawClipId,
   repointRawClipId,
   upsertClipLibraryRow,
@@ -433,14 +434,16 @@ export type PlannerTask = {
   hashtags: string | null;
   thumbnailUrl: string | null;
   clipUrl: string | null;
+  transcript: string | null;
 };
 
 /**
  * A task is either clip-sourced (its "Clip Source ID" holds the Neon clip_details.id it was
- * built from — the thumbnail and a representative openable link live in Neon, populated by the
- * AI analysis pipeline for nearly every clip) or not (a Canva-exported carousel slide, etc. —
- * its own Airtable "Thumbnail"/"Link" fields are the only source). This resolves whichever
- * applies, for every task regardless of channel — not just TikTok.
+ * built from — the thumbnail, a representative openable link, and the full transcript all live
+ * in Neon, populated by the AI analysis pipeline for nearly every clip) or not (a Canva-exported
+ * carousel slide, etc. — its own Airtable "Thumbnail"/"Link" fields are the only source, and it
+ * has no transcript). This resolves whichever applies, for every task regardless of channel —
+ * not just TikTok.
  */
 export async function listTasksAction(): Promise<PlannerTask[]> {
   await requireSession();
@@ -453,9 +456,10 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
         .filter((id): id is string => !!id)
     ),
   ];
-  const [clipThumbnails, clipLinks] = await Promise.all([
+  const [clipThumbnails, clipLinks, clipTranscripts] = await Promise.all([
     getClipThumbnails(clipSourceIds),
     getClipRepresentativeLinks(clipSourceIds),
+    getClipTranscripts(clipSourceIds),
   ]);
 
   return tasks.map((t) => {
@@ -467,6 +471,7 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       null;
     const clipPath = clipSourceId ? clipLinks[clipSourceId] : null;
     const clipUrl = clipPath ? resolveCopyLink(clipPath) : (t.fields[FIELDS.tasks.link] ?? null);
+    const transcript = clipSourceId ? (clipTranscripts[clipSourceId] ?? null) : null;
     return {
       id: t.id,
       name: t.fields[FIELDS.tasks.name],
@@ -478,6 +483,7 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       hashtags: t.fields[FIELDS.tasks.hashtags] ?? null,
       thumbnailUrl,
       clipUrl,
+      transcript,
     };
   });
 }

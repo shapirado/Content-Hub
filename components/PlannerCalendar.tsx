@@ -82,33 +82,27 @@ function StatusPill({
   );
 }
 
-function ExpandableContent({ text }: { text: string | null }) {
-  const [expanded, setExpanded] = useState(false);
-  if (!text) return null;
-  const preview = text.length > 80 ? text.slice(0, 80) + "..." : text;
-  return (
-    <div>
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-on-surface-variant">
-        {expanded ? text : preview}
-      </p>
-      {text.length > 80 && (
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-1 text-xs font-bold text-primary hover:underline"
-        >
-          {expanded ? "הציגי פחות" : "הציגי עוד"}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** Hook (preserving an embedded alt-hook line break) + Hashtags as their own structured fields — Airtable now carries these separately instead of only inside Full Content's prose — followed by the still-useful expandable full text (overlay/CTA/source-clip context). */
+/**
+ * Hook (primary line bigger/italic, an embedded alt-hook second line smaller below it) +
+ * Hashtags — Airtable now carries these as their own fields instead of only inside Full
+ * Content's prose — followed by the expandable full text, which in its expanded state also
+ * surfaces the source clip's complete transcript (from Neon, clip-sourced tasks only) so the
+ * post can be written/checked against exactly what was said, not just the AI's hook/summary.
+ */
 function TaskContent({ task }: { task: PlannerTask }) {
+  const [expanded, setExpanded] = useState(false);
+  const hookLines = task.hook ? task.hook.split("\n").map((l) => l.trim()).filter(Boolean) : [];
+  const fullContent = task.fullContent;
+  const preview = fullContent && fullContent.length > 80 ? fullContent.slice(0, 80) + "..." : fullContent;
+  const canExpand = (!!fullContent && fullContent.length > 80) || !!task.transcript;
+
   return (
     <>
-      {task.hook && (
-        <p className="mb-2 whitespace-pre-wrap text-sm font-bold text-on-surface">{task.hook}</p>
+      {hookLines[0] && (
+        <p className="mb-0.5 text-base italic font-bold text-on-surface">{hookLines[0]}</p>
+      )}
+      {hookLines[1] && (
+        <p className="mb-2 text-xs italic text-on-surface-variant">{hookLines[1]}</p>
       )}
       {task.hashtags && (
         <div className="mb-2 flex flex-wrap gap-1.5">
@@ -125,7 +119,29 @@ function TaskContent({ task }: { task: PlannerTask }) {
             ))}
         </div>
       )}
-      <ExpandableContent text={task.fullContent} />
+      {fullContent && (
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-on-surface-variant">
+          {expanded ? fullContent : preview}
+        </p>
+      )}
+      {expanded && task.transcript && (
+        <div className="mt-3">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+            תמלול מלא
+          </p>
+          <p className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded bg-surface-container-lowest p-3 text-xs leading-relaxed text-on-surface-variant">
+            {task.transcript}
+          </p>
+        </div>
+      )}
+      {canExpand && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs font-bold text-primary hover:underline"
+        >
+          {expanded ? "הציגי פחות" : "הציגי עוד"}
+        </button>
+      )}
     </>
   );
 }
@@ -286,20 +302,37 @@ export function PlannerCalendar({
               <div className="space-y-3">
                 {tikTokTasks.map((t) => (
                   <div key={t.id} className="flex gap-4 rounded-2xl bg-surface-container-lowest p-5">
-                    <div className="flex h-64 w-40 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-high">
-                      {t.thumbnailUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={t.thumbnailUrl}
-                          alt={t.name}
-                          className="h-full w-full object-cover"
-                        />
+                    {(() => {
+                      const thumb = (
+                        <div className="flex h-64 w-40 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-high">
+                          {t.thumbnailUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={t.thumbnailUrl}
+                              alt={t.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="material-symbols-outlined text-xl text-on-surface-variant/40">
+                              movie
+                            </span>
+                          )}
+                        </div>
+                      );
+                      return t.clipUrl ? (
+                        <a
+                          href={t.clipUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="נגני את הקליפ"
+                          className="shrink-0"
+                        >
+                          {thumb}
+                        </a>
                       ) : (
-                        <span className="material-symbols-outlined text-xl text-on-surface-variant/40">
-                          movie
-                        </span>
-                      )}
-                    </div>
+                        thumb
+                      );
+                    })()}
                     <div className="min-w-0 flex-1">
                       <div className="mb-2 flex items-start justify-between gap-2">
                         <span className="text-sm font-bold text-primary">{t.name}</span>
