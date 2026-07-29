@@ -279,9 +279,22 @@ export function PlannerCalendar({
                   </div>
                   <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                 </div>
-                <span className="mb-3 block text-[11px] text-on-surface-variant">
-                  {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
-                </span>
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-[11px] text-on-surface-variant">
+                    {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                  </span>
+                  {t.viewLinkUrl && (
+                    <a
+                      href={t.viewLinkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary hover:bg-primary/20"
+                    >
+                      <span className="material-symbols-outlined text-sm">palette</span>
+                      צפייה בעיצוב
+                    </a>
+                  )}
+                </div>
                 <TaskContent task={t} />
               </div>
             ))}

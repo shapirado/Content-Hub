@@ -435,7 +435,15 @@ export type PlannerTask = {
   thumbnailUrl: string | null;
   clipUrl: string | null;
   transcript: string | null;
+  /** The first Canva/Links "view" URL referenced by this task (e.g. an Instagram carousel slide design) — for non-clip content there's no Neon thumbnail to show, so this is a clickable "view design" link instead. */
+  viewLinkUrl: string | null;
 };
+
+/** Pulls the first "view: <url>" occurrence out of a Task's denormalized Linked URLs summary (e.g. "Slide 1 — view: https://... / edit: https://..."). */
+function firstViewLinkUrl(linkedUrls: string | undefined): string | null {
+  if (!linkedUrls) return null;
+  return linkedUrls.match(/view:\s*(\S+)/)?.[1] ?? null;
+}
 
 /**
  * A task is either clip-sourced (its "Clip Source ID" holds the Neon clip_details.id it was
@@ -484,6 +492,7 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       thumbnailUrl,
       clipUrl,
       transcript,
+      viewLinkUrl: firstViewLinkUrl(t.fields[FIELDS.tasks.linkedUrls]),
     };
   });
 }

@@ -65,6 +65,8 @@ export const FIELDS = {
     link: "fldeQE0pcOxBQJTCQ",
     hook: "fldcxr6GzLdolMc9n",
     hashtags: "fldlg4Y2FAtjUXRXs",
+    /** Plain-text summary of this task's linked Links records (e.g. Canva "Slide 1 — view: <url> / edit: <url>"), copied here so the app doesn't need a separate Links-table lookup. */
+    linkedUrls: "fldmajW31LEf3JSqT",
   },
 } as const;
 
@@ -393,6 +395,7 @@ export type TaskFields = {
   [FIELDS.tasks.link]?: string;
   [FIELDS.tasks.hook]?: string;
   [FIELDS.tasks.hashtags]?: string;
+  [FIELDS.tasks.linkedUrls]?: string;
 };
 
 /** All Tasks records — data volume is a handful per week, so client-side week-filtering is simpler than a formula-based date-range query. Paginates past Airtable's 100-per-page limit. */
