@@ -103,6 +103,33 @@ function ExpandableContent({ text }: { text: string | null }) {
   );
 }
 
+/** Hook (preserving an embedded alt-hook line break) + Hashtags as their own structured fields — Airtable now carries these separately instead of only inside Full Content's prose — followed by the still-useful expandable full text (overlay/CTA/source-clip context). */
+function TaskContent({ task }: { task: PlannerTask }) {
+  return (
+    <>
+      {task.hook && (
+        <p className="mb-2 whitespace-pre-wrap text-sm font-bold text-on-surface">{task.hook}</p>
+      )}
+      {task.hashtags && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {task.hashtags
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary"
+              >
+                {tag}
+              </span>
+            ))}
+        </div>
+      )}
+      <ExpandableContent text={task.fullContent} />
+    </>
+  );
+}
+
 export function PlannerCalendar({
   initialTasks,
   initialWeekStartKey,
@@ -197,15 +224,28 @@ export function PlannerCalendar({
                 <div key={dateKey} className="rounded-2xl bg-surface-container-low p-2.5">
                   <div className="mb-1 text-[10px] text-on-surface-variant/60">{DAY_LABELS[i]}</div>
                   <div className="mb-2 text-sm font-bold text-on-surface">{day.getDate()}</div>
-                  {dayTasks.map((t) => (
-                    <div
-                      key={t.id}
-                      className="mb-1 truncate rounded bg-primary-container px-1.5 py-1 text-[10px] text-on-primary-container"
-                      title={t.name}
-                    >
-                      {t.name}
-                    </div>
-                  ))}
+                  {dayTasks.map((t) =>
+                    t.clipUrl ? (
+                      <a
+                        key={t.id}
+                        href={t.clipUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mb-1 block truncate rounded bg-primary-fixed px-1.5 py-1 text-[10px] text-on-primary-fixed hover:opacity-80"
+                        title={t.name}
+                      >
+                        {t.name}
+                      </a>
+                    ) : (
+                      <div
+                        key={t.id}
+                        className="mb-1 truncate rounded bg-primary-fixed px-1.5 py-1 text-[10px] text-on-primary-fixed"
+                        title={t.name}
+                      >
+                        {t.name}
+                      </div>
+                    )
+                  )}
                 </div>
               );
             })}
@@ -226,7 +266,7 @@ export function PlannerCalendar({
                 <span className="mb-3 block text-[11px] text-on-surface-variant">
                   {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
                 </span>
-                <ExpandableContent text={t.fullContent} />
+                <TaskContent task={t} />
               </div>
             ))}
           </section>
@@ -246,7 +286,7 @@ export function PlannerCalendar({
               <div className="space-y-3">
                 {tikTokTasks.map((t) => (
                   <div key={t.id} className="flex gap-4 rounded-2xl bg-surface-container-lowest p-5">
-                    <div className="flex h-20 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-high">
+                    <div className="flex h-64 w-40 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-high">
                       {t.thumbnailUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -270,7 +310,7 @@ export function PlannerCalendar({
                           <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                         </div>
                       </div>
-                      <ExpandableContent text={t.fullContent} />
+                      <TaskContent task={t} />
                     </div>
                   </div>
                 ))}
@@ -298,7 +338,7 @@ export function PlannerCalendar({
                       </div>
                       <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                     </div>
-                    <ExpandableContent text={t.fullContent} />
+                    <TaskContent task={t} />
                   </div>
                 ))}
               </div>
@@ -330,7 +370,7 @@ export function PlannerCalendar({
                   <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                 </div>
               </div>
-              <ExpandableContent text={t.fullContent} />
+              <TaskContent task={t} />
             </div>
           ))}
         </section>

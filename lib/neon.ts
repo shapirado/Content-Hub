@@ -196,6 +196,22 @@ export async function getClipDetails(id: string): Promise<ClipDetails | null> {
   return rows[0] ?? null;
 }
 
+/** A representative openable link (the earliest url-type copy, else the earliest copy's bare path) for a batch of clip_details rows, keyed by id — resolves Planner task calendar-chip links for clip-sourced tasks. Bare paths still need `resolveCopyLink` (lib/paths.ts) applied by the caller to become a real Drive search link. */
+export async function getClipRepresentativeLinks(clipDetIds: string[]): Promise<Record<string, string | null>> {
+  if (clipDetIds.length === 0) return {};
+  const client = sql();
+  const rows = (await client`
+    select cd.id,
+           coalesce(
+             (select c.path from clips c where c.clip_det_id = cd.id and c.path ~* '^https?://' order by c.created_at limit 1),
+             (select c.path from clips c where c.clip_det_id = cd.id order by c.created_at limit 1)
+           ) as path
+    from clip_details cd
+    where cd.id = ANY(${clipDetIds})
+  `) as unknown as { id: string; path: string | null }[];
+  return Object.fromEntries(rows.map((r) => [r.id, r.path]));
+}
+
 /** Thumbnails for a batch of clip_details rows, keyed by id — resolves Planner task thumbnails for clip-sourced tasks (Airtable Tasks."Clip Source ID"), so a task's thumbnail always reflects the real analyzed clip instead of requiring a separate Airtable attachment upload. */
 export async function getClipThumbnails(clipDetIds: string[]): Promise<Record<string, string | null>> {
   if (clipDetIds.length === 0) return {};

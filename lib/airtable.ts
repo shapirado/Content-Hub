@@ -61,6 +61,10 @@ export const FIELDS = {
     clipSourceId: "fldy6KXFQtcvaw2A9",
     /** Only populated for non-clip-sourced tasks (e.g. a Canva carousel slide) — clip-sourced tasks resolve their thumbnail via clipSourceId instead. */
     thumbnail: "fldNKroxxhyipT9rM",
+    /** Only populated for non-clip-sourced tasks — clip-sourced tasks resolve their URL via clipSourceId/Neon instead. */
+    link: "fldeQE0pcOxBQJTCQ",
+    hook: "fldcxr6GzLdolMc9n",
+    hashtags: "fldlg4Y2FAtjUXRXs",
   },
 } as const;
 
@@ -386,6 +390,9 @@ export type TaskFields = {
   [FIELDS.tasks.contentInventoryLink]?: string[];
   [FIELDS.tasks.clipSourceId]?: string;
   [FIELDS.tasks.thumbnail]?: AirtableAttachment[];
+  [FIELDS.tasks.link]?: string;
+  [FIELDS.tasks.hook]?: string;
+  [FIELDS.tasks.hashtags]?: string;
 };
 
 /** All Tasks records — data volume is a handful per week, so client-side week-filtering is simpler than a formula-based date-range query. Paginates past Airtable's 100-per-page limit. */

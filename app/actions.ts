@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import {
   getClipDetails,
   getClipLibraryRow,
+  getClipRepresentativeLinks,
   getClipThumbnails,
   listClipIdsForRawClipId,
   repointRawClipId,
@@ -27,7 +28,7 @@ import {
   type ClipPerformanceUpsert,
   type ClipExportRow,
 } from "@/lib/neon";
-import { isUrlPath } from "@/lib/paths";
+import { isUrlPath, resolveCopyLink } from "@/lib/paths";
 import {
   FIELDS,
   createCopyRecord,
@@ -428,16 +429,18 @@ export type PlannerTask = {
   channel: string | null;
   status: string | null;
   fullContent: string | null;
+  hook: string | null;
+  hashtags: string | null;
   thumbnailUrl: string | null;
+  clipUrl: string | null;
 };
 
-/** All Tasks for the Planner page. TikTok-channel tasks get a thumbnail resolved from their linked Content Inventory record — the only card type that shows one, since Instagram/newsletter tasks don't reliably have a Content Inventory link yet. */
 /**
  * A task is either clip-sourced (its "Clip Source ID" holds the Neon clip_details.id it was
- * built from — the thumbnail lives in Neon, populated by the AI analysis pipeline for nearly
- * every clip) or not (a Canva-exported carousel slide, etc. — its own Airtable "Thumbnail"
- * attachment is the only source). This resolves whichever applies, for every task regardless
- * of channel — not just TikTok.
+ * built from — the thumbnail and a representative openable link live in Neon, populated by the
+ * AI analysis pipeline for nearly every clip) or not (a Canva-exported carousel slide, etc. —
+ * its own Airtable "Thumbnail"/"Link" fields are the only source). This resolves whichever
+ * applies, for every task regardless of channel — not just TikTok.
  */
 export async function listTasksAction(): Promise<PlannerTask[]> {
   await requireSession();
@@ -450,7 +453,10 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
         .filter((id): id is string => !!id)
     ),
   ];
-  const clipThumbnails = await getClipThumbnails(clipSourceIds);
+  const [clipThumbnails, clipLinks] = await Promise.all([
+    getClipThumbnails(clipSourceIds),
+    getClipRepresentativeLinks(clipSourceIds),
+  ]);
 
   return tasks.map((t) => {
     const clipSourceId = t.fields[FIELDS.tasks.clipSourceId];
@@ -459,6 +465,8 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       t.fields[FIELDS.tasks.thumbnail]?.[0]?.thumbnails?.small?.url ??
       t.fields[FIELDS.tasks.thumbnail]?.[0]?.url ??
       null;
+    const clipPath = clipSourceId ? clipLinks[clipSourceId] : null;
+    const clipUrl = clipPath ? resolveCopyLink(clipPath) : (t.fields[FIELDS.tasks.link] ?? null);
     return {
       id: t.id,
       name: t.fields[FIELDS.tasks.name],
@@ -466,7 +474,10 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       channel: t.fields[FIELDS.tasks.channel] ?? null,
       status: t.fields[FIELDS.tasks.status] ?? null,
       fullContent: t.fields[FIELDS.tasks.fullContent] ?? null,
+      hook: t.fields[FIELDS.tasks.hook] ?? null,
+      hashtags: t.fields[FIELDS.tasks.hashtags] ?? null,
       thumbnailUrl,
+      clipUrl,
     };
   });
 }
