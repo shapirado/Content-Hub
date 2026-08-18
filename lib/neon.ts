@@ -244,6 +244,23 @@ export async function listClipCopies(clipDetId: string): Promise<ClipCopy[]> {
   return rows;
 }
 
+/** All physical copies for a batch of logical clips at once, grouped by clip_det_id — for the Planner page's copies column, which needs every copy for several clip-sourced tasks in one query rather than one round-trip per task. */
+export async function listClipCopiesForIds(clipDetIds: string[]): Promise<Record<string, ClipCopy[]>> {
+  if (clipDetIds.length === 0) return {};
+  const client = sql();
+  const rows = (await client`
+    select id, clip_det_id, source_type, path, platform, title, created_at
+    from clips
+    where clip_det_id = ANY(${clipDetIds})
+    order by created_at
+  `) as unknown as ClipCopy[];
+  const byClipDetId: Record<string, ClipCopy[]> = {};
+  for (const row of rows) {
+    (byClipDetId[row.clip_det_id] ??= []).push(row);
+  }
+  return byClipDetId;
+}
+
 export type ClipPathMatch = { copyId: string; path: string; clipDetId: string; title: string | null };
 
 /** Finds existing copy paths (on OTHER clips) matching a search string — surfaces likely duplicates before adding a new copy. */

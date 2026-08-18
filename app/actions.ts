@@ -7,6 +7,7 @@ import {
   getClipRepresentativeLinks,
   getClipThumbnails,
   getClipTranscripts,
+  listClipCopiesForIds,
   listClipIdsForRawClipId,
   repointRawClipId,
   upsertClipLibraryRow,
@@ -437,6 +438,8 @@ export type PlannerTask = {
   transcript: string | null;
   /** The first Canva/Links "view" URL referenced by this task (e.g. an Instagram carousel slide design) — for non-clip content there's no Neon thumbnail to show, so this is a clickable "view design" link instead. */
   viewLinkUrl: string | null;
+  /** Every physical copy (Drive file, YouTube upload, ...) of the source clip — a clip can live in more than one place, and the schedule should show all of them, not just the one representative link. Empty for non-clip-sourced tasks. */
+  copies: { path: string; platform: string | null; url: string }[];
 };
 
 /** Pulls the first "view: <url>" occurrence out of a Task's denormalized Linked URLs summary (e.g. "Slide 1 — view: https://... / edit: https://..."). */
@@ -464,10 +467,11 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
         .filter((id): id is string => !!id)
     ),
   ];
-  const [clipThumbnails, clipLinks, clipTranscripts] = await Promise.all([
+  const [clipThumbnails, clipLinks, clipTranscripts, clipCopiesById] = await Promise.all([
     getClipThumbnails(clipSourceIds),
     getClipRepresentativeLinks(clipSourceIds),
     getClipTranscripts(clipSourceIds),
+    listClipCopiesForIds(clipSourceIds),
   ]);
 
   return tasks.map((t) => {
@@ -480,6 +484,7 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
     const clipPath = clipSourceId ? clipLinks[clipSourceId] : null;
     const clipUrl = clipPath ? resolveCopyLink(clipPath) : (t.fields[FIELDS.tasks.link] ?? null);
     const transcript = clipSourceId ? (clipTranscripts[clipSourceId] ?? null) : null;
+    const copies = (clipSourceId ? clipCopiesById[clipSourceId] : undefined) ?? [];
     return {
       id: t.id,
       name: t.fields[FIELDS.tasks.name],
@@ -493,6 +498,7 @@ export async function listTasksAction(): Promise<PlannerTask[]> {
       clipUrl,
       transcript,
       viewLinkUrl: firstViewLinkUrl(t.fields[FIELDS.tasks.linkedUrls]),
+      copies: copies.map((c) => ({ path: c.path, platform: c.platform, url: resolveCopyLink(c.path) })),
     };
   });
 }

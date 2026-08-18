@@ -146,6 +146,31 @@ function TaskContent({ task }: { task: PlannerTask }) {
   );
 }
 
+/** Read-only list of every physical copy of a clip-sourced task's source clip — a clip can live in more than one place (Drive, YouTube, ...), and the schedule should surface all of them, not just one representative link. No edit/delete/platform-assign controls here; that editing UI lives in the media library, not the read-mostly Planner. */
+function CopiesColumn({ copies }: { copies: PlannerTask["copies"] }) {
+  if (copies.length === 0) return null;
+  return (
+    <div className="w-44 shrink-0 space-y-1.5 border-r border-outline-variant/30 pr-4">
+      <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+        עותקים
+      </p>
+      {copies.map((c, i) => (
+        <a
+          key={i}
+          href={c.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={c.path}
+          className="flex items-center gap-1 text-[11px] text-on-surface-variant hover:text-primary"
+        >
+          <span className="material-symbols-outlined shrink-0 text-sm">open_in_new</span>
+          <span className="truncate">{c.platform ?? c.path.split(/[\\/]/).pop()}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function PlannerCalendar({
   initialTasks,
   initialWeekStartKey,
@@ -358,6 +383,7 @@ export function PlannerCalendar({
                       </div>
                       <TaskContent task={t} />
                     </div>
+                    <CopiesColumn copies={t.copies} />
                   </div>
                 ))}
               </div>
