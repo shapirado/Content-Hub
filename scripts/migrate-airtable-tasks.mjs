@@ -71,7 +71,8 @@ async function main() {
 
     const platform = mapPlatform(f[F.channel]);
     const status = mapStatus(f[F.status]);
-    const clipDetId = f[F.clipSourceId] ?? null;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const clipDetId = UUID_RE.test(f[F.clipSourceId] ?? "") ? f[F.clipSourceId] : null;
     const hook = f[F.hook] ?? null;
     const caption = f[F.fullContent] ?? null;
     const hashtags = f[F.hashtags] ?? null;
@@ -80,13 +81,14 @@ async function main() {
       await sql`
         INSERT INTO content_tasks (clip_det_id, platform, scheduled_date, status, hook, caption, hashtags)
         VALUES (${clipDetId}, ${platform}, ${scheduledDate}, ${status}, ${hook}, ${caption}, ${hashtags})
-        ON CONFLICT DO NOTHING
       `;
       inserted++;
     } catch (error) {
       // Check if this is a foreign key constraint violation (PostgreSQL error code 23503)
-      if (error.code === "23503") {
+      // or an invalid UUID syntax error (PostgreSQL error code 22P02)
+      if (error.code === "23503" || error.code === "22P02") {
         fkSkipped++;
+        continue;
       } else {
         throw error;
       }

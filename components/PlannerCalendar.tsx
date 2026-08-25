@@ -327,6 +327,16 @@ export function PlannerCalendar({
                   </span>
                 </div>
                 <TaskContent task={t} />
+                {t.canva_url && (
+                  <a
+                    href={t.canva_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    צפייה בעיצוב
+                  </a>
+                )}
               </div>
             ))}
           </section>
