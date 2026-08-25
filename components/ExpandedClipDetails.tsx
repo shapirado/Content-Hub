@@ -14,7 +14,7 @@ import {
   listKnownDriveFoldersAction,
   updateClipTranscriptAction,
 } from "@/app/actions";
-import { OPTIONS } from "@/lib/airtable";
+import { OPTIONS } from "@/lib/options";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
 import { isUrlPath, resolveCopyLink, KNOWN_DRIVE_FOLDERS, shortenFolderLabel } from "@/lib/paths";
 import type { ClipCopy, ClipDetails, ClipLibraryRow, ClipPathMatch, ClipPerformance } from "@/lib/neon";

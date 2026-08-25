@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { listAllRawClipRecordsAction, type RawClipBrowserRecord } from "@/app/actions";
-import { OPTIONS } from "@/lib/airtable";
+import { OPTIONS } from "@/lib/options";
 import { seasonIcon } from "@/lib/types";
 import { MergeRawClipsModal } from "./MergeRawClipsModal";
 

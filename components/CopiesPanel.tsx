@@ -6,7 +6,7 @@ import {
   createCopyAction,
   searchCopiesAction,
 } from "@/app/actions";
-import { OPTIONS } from "@/lib/airtable";
+import { OPTIONS } from "@/lib/options";
 import type { ClipLibraryRow } from "@/lib/neon";
 
 type SearchResult = { id: string; title: string; copyText: string; platform: string | null };
