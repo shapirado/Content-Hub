@@ -1,19 +1,13 @@
-import { listAllRawClipRecordsAction } from "@/app/actions";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
-import { RawClipBrowser } from "@/components/RawClipBrowser";
 
-export const dynamic = "force-dynamic";
-
-export default async function RawClipsPage() {
-  const records = await listAllRawClipRecordsAction();
-
+export default function RawClipsPage() {
   return (
     <>
-      <Sidebar active="rawClips" />
+      <Sidebar active="library" />
       <TopBar />
-      <main className="mr-64 mt-16 min-h-[calc(100vh-64px)] bg-background p-8">
-        <RawClipBrowser initialRecords={records} />
+      <main className="mr-64 mt-16 flex min-h-[calc(100vh-64px)] items-center justify-center bg-background">
+        <p className="text-on-surface-variant">דף זה עובר שדרוג ויחזור בקרוב.</p>
       </main>
     </>
   );
