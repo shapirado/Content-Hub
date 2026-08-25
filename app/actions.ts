@@ -3,14 +3,10 @@
 import { auth } from "@/auth";
 import {
   getClipDetails,
-  getClipLibraryRow,
   getClipRepresentativeLinks,
   getClipThumbnails,
   getClipTranscripts,
   listClipCopiesForIds,
-  listClipIdsForRawClipId,
-  repointRawClipId,
-  upsertClipLibraryRow,
   listClipCopies,
   addClipCopy,
   removeClipCopy,
@@ -26,27 +22,14 @@ import {
   mergeClipDetails,
   deleteClipDetails,
   getClipsForExport,
-  type ClipLibraryUpsert,
+  listContentTasks,
+  updateContentTaskStatus,
+  type ClipLibraryRow,
   type ClipPerformanceUpsert,
   type ClipExportRow,
+  type ContentTask,
 } from "@/lib/neon";
-import { isUrlPath, resolveCopyLink } from "@/lib/paths";
-import {
-  FIELDS,
-  createCopyRecord,
-  createRawClipLibraryRecord,
-  deleteRawClipLibraryRecord,
-  getContentInventoryRecords,
-  getCopiesRecords,
-  getRawClipLibraryRecord,
-  linkCopyToRawClip,
-  listAllRawClipLibraryRecords,
-  listAllTasks,
-  searchCopies,
-  searchRawClipLibrary,
-  updateRawClipLibraryRecord,
-  updateTaskStatus,
-} from "@/lib/airtable";
+import { resolveCopyLink } from "@/lib/paths";
 
 async function requireSession() {
   const session = await auth();
@@ -126,121 +109,6 @@ export async function deleteClipDetailsAction(clipId: string) {
   return deleteClipDetails(clipId);
 }
 
-export async function searchRawClipLibraryAction(query: string) {
-  await requireSession();
-  if (!query.trim()) return [];
-  const records = await searchRawClipLibrary(query);
-  return records.map((r) => ({
-    id: r.id,
-    name: r.fields[FIELDS.rawClipLibrary.name],
-    youtubeLink: r.fields[FIELDS.rawClipLibrary.youtubeLink] ?? null,
-  }));
-}
-
-/** Newest-line-first entries from the Alternate Sources multilineText field. */
-function parseAlternateSources(raw: string | undefined): string[] {
-  if (!raw) return [];
-  return raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-}
-
-const STATUS_PRIORITY = ["Posted", "Reviewed", "Drafted"] as const;
-
-/** Picks the most-advanced status among a set of Content Inventory statuses. */
-function bestStatus(statuses: (string | undefined)[]): string | null {
-  for (const candidate of STATUS_PRIORITY) {
-    if (statuses.includes(candidate)) return candidate;
-  }
-  return statuses.find((s): s is string => !!s) ?? null;
-}
-
-function sumOrNull(values: (number | undefined)[]): number | null {
-  const present = values.filter((v): v is number => v !== undefined);
-  if (present.length === 0) return null;
-  return present.reduce((a, b) => a + b, 0);
-}
-
-/** Builds the merged clip_library row from a Raw Clip Library record (following its Airtable links) and upserts it. Aggregates across *all* linked Content Inventory records — a clip may have been posted multiple times (different platforms, or merged from a duplicate). */
-async function syncClipLibraryFromRawClip(clipId: string, rawClipRecordId: string) {
-  const rawClip = await getRawClipLibraryRecord(rawClipRecordId);
-  const contentInventoryIds = rawClip.fields[FIELDS.rawClipLibrary.contentInventoryLink] ?? [];
-  const copiesIds = rawClip.fields[FIELDS.rawClipLibrary.copiesLink] ?? [];
-
-  const [contentInventory, copiesRecords] = await Promise.all([
-    getContentInventoryRecords(contentInventoryIds),
-    getCopiesRecords(copiesIds),
-  ]);
-
-  const platforms = [
-    ...new Set(contentInventory.flatMap((c) => c.fields[FIELDS.contentInventory.platforms] ?? [])),
-  ];
-  const firstNonEmpty = <T,>(values: (T | undefined)[]): T | null =>
-    values.find((v): v is T => v !== undefined && v !== "") ?? null;
-
-  const row: ClipLibraryUpsert = {
-    clip_id: clipId,
-    airtable_raw_clip_id: rawClip.id,
-    airtable_content_inventory_ids: contentInventory.map((c) => c.id),
-    title: rawClip.fields[FIELDS.rawClipLibrary.name] ?? null,
-    youtube_link: rawClip.fields[FIELDS.rawClipLibrary.youtubeLink] ?? null,
-    pillar: rawClip.fields[FIELDS.rawClipLibrary.pillar] ?? null,
-    season: rawClip.fields[FIELDS.rawClipLibrary.season] ?? null,
-    context_tags: rawClip.fields[FIELDS.rawClipLibrary.contextTags] ?? [],
-    usable: rawClip.fields[FIELDS.rawClipLibrary.usable] ?? null,
-    posted_to_tiktok: rawClip.fields[FIELDS.rawClipLibrary.postedToTikTok] ?? null,
-    wardrobe: rawClip.fields[FIELDS.rawClipLibrary.wardrobe] ?? null,
-    alternate_sources: parseAlternateSources(rawClip.fields[FIELDS.rawClipLibrary.alternateSources]),
-    // Content Inventory's status (Drafted/Reviewed/Posted), not Raw Clip Library's —
-    // that field just duplicated "usable" and has been dropped from the UI.
-    status: bestStatus(contentInventory.map((c) => c.fields[FIELDS.contentInventory.status])),
-    platforms,
-    hook_key_line: firstNonEmpty(contentInventory.map((c) => c.fields[FIELDS.contentInventory.hookKeyLine])),
-    hashtags: firstNonEmpty(contentInventory.map((c) => c.fields[FIELDS.contentInventory.hashtagsUsed])),
-    live_post_url: firstNonEmpty(contentInventory.map((c) => c.fields[FIELDS.contentInventory.livePostUrl])),
-    views: sumOrNull(contentInventory.map((c) => c.fields[FIELDS.contentInventory.views])),
-    likes: sumOrNull(contentInventory.map((c) => c.fields[FIELDS.contentInventory.likes])),
-    shares: sumOrNull(contentInventory.map((c) => c.fields[FIELDS.contentInventory.shares])),
-    comments: sumOrNull(contentInventory.map((c) => c.fields[FIELDS.contentInventory.comments])),
-    copies: copiesRecords.map((c) => ({
-      title: c.fields[FIELDS.copies.title],
-      copyText: c.fields[FIELDS.copies.copyText] ?? "",
-      platform: c.fields[FIELDS.copies.platform] ?? null,
-    })),
-  };
-
-  await upsertClipLibraryRow(row);
-  return getClipLibraryRow(clipId);
-}
-
-/**
- * Every clip is manageable (pillar/season/tags/usable/copies) whether or not it's linked to
- * Airtable yet. This resolves the linked Raw Clip Library record, silently creating a minimal
- * one (Name + YouTube Link from the Neon clip) the first time any field is edited.
- */
-async function getOrCreateRawClipRecord(clipId: string): Promise<string> {
-  const existing = await getClipLibraryRow(clipId);
-  if (existing?.airtable_raw_clip_id) return existing.airtable_raw_clip_id;
-
-  const details = await getClipDetails(clipId);
-  if (!details) throw new Error("Clip not found");
-  const copies = await listClipCopies(clipId);
-  const urlCopy = copies.find((c) => isUrlPath(c.path));
-
-  const created = await createRawClipLibraryRecord({
-    [FIELDS.rawClipLibrary.name]: details.title ?? copies[0]?.path ?? "Untitled clip",
-    [FIELDS.rawClipLibrary.youtubeLink]: urlCopy?.path ?? undefined,
-  });
-  return created.id;
-}
-
-/** Attaches an existing Raw Clip Library record to a Neon clip — the secondary "link to existing" flow, for avoiding duplicates when Airtable already has a matching record. */
-export async function linkClipToExistingRawClipAction(clipId: string, rawClipRecordId: string) {
-  await requireSession();
-  return syncClipLibraryFromRawClip(clipId, rawClipRecordId);
-}
-
 /** Edits pillar/season/context tags/usable/wardrobe/TikTok-posted directly on clip_details in Neon — no Airtable round-trip. */
 export async function updateClipMetadataAction(
   clipId: string,
@@ -272,34 +140,88 @@ export async function updateClipTranscriptAction(clipId: string, transcript: str
   return updateClipTranscript(clipId, transcript);
 }
 
-export async function searchCopiesAction(query: string) {
+/** Every clip_details field, one row per matching clip_performance record, for whichever clip ids are currently filtered/searched in the UI. */
+export async function exportClipsAction(clipIds: string[]): Promise<ClipExportRow[]> {
   await requireSession();
-  if (!query.trim()) return [];
-  const records = await searchCopies(query);
-  return records.map((r) => ({
-    id: r.id,
-    title: r.fields[FIELDS.copies.title],
-    copyText: r.fields[FIELDS.copies.copyText] ?? "",
-    platform: r.fields[FIELDS.copies.platform] ?? null,
-  }));
+  return getClipsForExport(clipIds);
 }
 
-export async function attachExistingCopyAction(clipId: string, copyRecordId: string) {
+export type PlannerTask = {
+  id: string;
+  platform: "tiktok" | "instagram" | "newsletter";
+  scheduled_date: string;    // ISO date YYYY-MM-DD
+  status: "ai_draft" | "pending_review" | "approved" | "posted";
+  hook: string | null;
+  caption: string | null;
+  hashtags: string | null;
+  canva_url: string | null;
+  live_url: string | null;
+  event_id: string | null;
+  thumbnailUrl: string | null;
+  clipUrl: string | null;
+  transcript: string | null;
+  copies: { path: string; platform: string | null; url: string | null }[];
+};
+
+export async function listTasksAction(): Promise<PlannerTask[]> {
   await requireSession();
-  const rawClipRecordId = await getOrCreateRawClipRecord(clipId);
-  await linkCopyToRawClip(copyRecordId, rawClipRecordId);
-  return syncClipLibraryFromRawClip(clipId, rawClipRecordId);
+  const tasks = await listContentTasks();
+
+  const clipSourceIds = [
+    ...new Set(
+      tasks.map((t) => t.clip_det_id).filter((id): id is string => !!id)
+    ),
+  ];
+
+  const [clipThumbnails, clipLinks, clipTranscripts, clipCopiesById] =
+    await Promise.all([
+      getClipThumbnails(clipSourceIds),
+      getClipRepresentativeLinks(clipSourceIds),
+      getClipTranscripts(clipSourceIds),
+      listClipCopiesForIds(clipSourceIds),
+    ]);
+
+  return tasks.map((t) => {
+    const thumbnailUrl = t.clip_det_id ? (clipThumbnails[t.clip_det_id] ?? null) : null;
+    const clipPath = t.clip_det_id ? (clipLinks[t.clip_det_id] ?? null) : null;
+    const clipUrl = clipPath ? resolveCopyLink(clipPath) : null;
+    const transcript = t.clip_det_id ? (clipTranscripts[t.clip_det_id] ?? null) : null;
+    const copies = (t.clip_det_id ? clipCopiesById[t.clip_det_id] : undefined) ?? [];
+
+    return {
+      id: t.id,
+      platform: t.platform,
+      scheduled_date: t.scheduled_date,
+      status: t.status,
+      hook: t.hook,
+      caption: t.caption,
+      hashtags: t.hashtags,
+      canva_url: t.canva_url,
+      live_url: t.live_url,
+      event_id: t.event_id,
+      thumbnailUrl,
+      clipUrl,
+      transcript,
+      copies: copies.map((c) => ({
+        path: c.path,
+        platform: c.platform,
+        url: resolveCopyLink(c.path),
+      })),
+    };
+  });
 }
 
-export async function createCopyAction(
-  clipId: string,
-  fields: { title: string; copyText: string; platform?: string }
-) {
+export async function updateTaskStatusAction(taskId: string, status: string): Promise<string> {
   await requireSession();
-  const rawClipRecordId = await getOrCreateRawClipRecord(clipId);
-  await createCopyRecord(rawClipRecordId, fields);
-  return syncClipLibraryFromRawClip(clipId, rawClipRecordId);
+  await updateContentTaskStatus(taskId, status);
+  return status;
 }
+
+// ---------------------------------------------------------------------------
+// Stubs for Airtable-backed actions that are being replaced in Task 8.
+// These keep downstream components type-safe until Task 8 removes or rewrites
+// the raw-clips page and the Airtable copies workflow.
+// ---------------------------------------------------------------------------
 
 export type RawClipBrowserRecord = {
   id: string;
@@ -316,196 +238,60 @@ export type RawClipBrowserRecord = {
   contentInventoryCount: number;
 };
 
-/** All Raw Clip Library records, independent of any Neon clip — powers the duplicate browser. */
-export async function listAllRawClipRecordsAction(): Promise<RawClipBrowserRecord[]> {
-  await requireSession();
-  const records = await listAllRawClipLibraryRecords();
-  return records.map((r) => ({
-    id: r.id,
-    name: r.fields[FIELDS.rawClipLibrary.name],
-    thumbnailUrl:
-      r.fields[FIELDS.rawClipLibrary.thumbnail]?.[0]?.thumbnails?.small?.url ??
-      r.fields[FIELDS.rawClipLibrary.thumbnail]?.[0]?.url ??
-      null,
-    youtubeLink: r.fields[FIELDS.rawClipLibrary.youtubeLink] ?? null,
-    pillar: r.fields[FIELDS.rawClipLibrary.pillar] ?? null,
-    season: r.fields[FIELDS.rawClipLibrary.season] ?? null,
-    usable: r.fields[FIELDS.rawClipLibrary.usable] ?? null,
-    wardrobe: r.fields[FIELDS.rawClipLibrary.wardrobe] ?? null,
-    contextTags: r.fields[FIELDS.rawClipLibrary.contextTags] ?? [],
-    postedToTikTok: !!r.fields[FIELDS.rawClipLibrary.postedToTikTok],
-    alternateSources: parseAlternateSources(r.fields[FIELDS.rawClipLibrary.alternateSources]),
-    contentInventoryCount: (r.fields[FIELDS.rawClipLibrary.contentInventoryLink] ?? []).length,
-  }));
-}
-
 export type MergeFieldChoices = {
   pillar?: string;
   season?: string;
   wardrobe?: string;
 };
 
-/**
- * Merges two Raw Clip Library records that describe the same real clip. `survivorId` keeps its
- * Name/record; usable and Alternate Sources auto-resolve (non-blank wins / accumulates), pillar/
- * season/wardrobe take whatever the caller resolved (a human radio-pick in the UI), context tags
- * union, TikTok-posted ORs, and every linked Content Inventory record carries over onto the
- * survivor so no post/performance history is lost. Any clip_library row pointing at the loser is
- * re-pointed and re-synced, then the loser is permanently deleted from Airtable.
- */
+/** @deprecated Replaced by Neon in Task 8. */
+export async function listAllRawClipRecordsAction(): Promise<RawClipBrowserRecord[]> {
+  throw new Error("listAllRawClipRecordsAction: Airtable removed — stub for Task 8");
+}
+
+/** @deprecated Replaced by Neon in Task 8. */
 export async function mergeRawClipRecordsAction(
-  survivorId: string,
-  loserId: string,
-  resolved: MergeFieldChoices
-) {
-  await requireSession();
-  const [survivor, loser] = await Promise.all([
-    getRawClipLibraryRecord(survivorId),
-    getRawClipLibraryRecord(loserId),
-  ]);
-
-  const usable =
-    survivor.fields[FIELDS.rawClipLibrary.usable] || loser.fields[FIELDS.rawClipLibrary.usable];
-  const contextTags = [
-    ...new Set([
-      ...(survivor.fields[FIELDS.rawClipLibrary.contextTags] ?? []),
-      ...(loser.fields[FIELDS.rawClipLibrary.contextTags] ?? []),
-    ]),
-  ];
-  const postedToTikTok =
-    !!survivor.fields[FIELDS.rawClipLibrary.postedToTikTok] ||
-    !!loser.fields[FIELDS.rawClipLibrary.postedToTikTok];
-  const contentInventoryLink = [
-    ...new Set([
-      ...(survivor.fields[FIELDS.rawClipLibrary.contentInventoryLink] ?? []),
-      ...(loser.fields[FIELDS.rawClipLibrary.contentInventoryLink] ?? []),
-    ]),
-  ];
-
-  const loserYoutubeLink = loser.fields[FIELDS.rawClipLibrary.youtubeLink];
-  const loserEntry = loserYoutubeLink
-    ? `${loser.fields[FIELDS.rawClipLibrary.name]} — ${loserYoutubeLink}`
-    : loser.fields[FIELDS.rawClipLibrary.name];
-  const alternateSources = [
-    ...new Set([
-      ...parseAlternateSources(survivor.fields[FIELDS.rawClipLibrary.alternateSources]),
-      ...parseAlternateSources(loser.fields[FIELDS.rawClipLibrary.alternateSources]),
-      loserEntry,
-    ]),
-  ];
-
-  await updateRawClipLibraryRecord(survivorId, {
-    [FIELDS.rawClipLibrary.pillar]: resolved.pillar ?? survivor.fields[FIELDS.rawClipLibrary.pillar],
-    [FIELDS.rawClipLibrary.season]: resolved.season ?? survivor.fields[FIELDS.rawClipLibrary.season],
-    [FIELDS.rawClipLibrary.wardrobe]:
-      resolved.wardrobe ?? survivor.fields[FIELDS.rawClipLibrary.wardrobe],
-    [FIELDS.rawClipLibrary.usable]: usable,
-    [FIELDS.rawClipLibrary.contextTags]: contextTags,
-    [FIELDS.rawClipLibrary.postedToTikTok]: postedToTikTok,
-    [FIELDS.rawClipLibrary.alternateSources]: alternateSources.join("\n"),
-    [FIELDS.rawClipLibrary.contentInventoryLink]: contentInventoryLink,
-  });
-
-  const repointedClipIds = await repointRawClipId(loserId, survivorId);
-  await deleteRawClipLibraryRecord(loserId);
-
-  // Re-sync every Neon clip now pointing at the survivor — both the ones re-pointed just now
-  // and any that were already linked to it, since its fields may have just changed.
-  const alreadyLinkedClipIds = await listClipIdsForRawClipId(survivorId);
-  const clipIdsToSync = [...new Set([...repointedClipIds, ...alreadyLinkedClipIds])];
-  await Promise.all(clipIdsToSync.map((clipId) => syncClipLibraryFromRawClip(clipId, survivorId)));
-
-  return { survivorId, syncedClipIds: clipIdsToSync };
+  _survivorId: string,
+  _loserId: string,
+  _resolved: MergeFieldChoices
+): Promise<{ survivorId: string; syncedClipIds: string[] }> {
+  throw new Error("mergeRawClipRecordsAction: Airtable removed — stub for Task 8");
 }
 
-/** Every clip_details field, one row per matching clip_performance record, for whichever clip ids are currently filtered/searched in the UI. */
-export async function exportClipsAction(clipIds: string[]): Promise<ClipExportRow[]> {
-  await requireSession();
-  return getClipsForExport(clipIds);
+/** @deprecated Replaced by Neon in Task 8. */
+export async function searchRawClipLibraryAction(
+  _query: string
+): Promise<{ id: string; name: string; youtubeLink: string | null }[]> {
+  throw new Error("searchRawClipLibraryAction: Airtable removed — stub for Task 8");
 }
 
-export type PlannerTask = {
-  id: string;
-  name: string;
-  date: string | null;
-  channel: string | null;
-  status: string | null;
-  fullContent: string | null;
-  hook: string | null;
-  hashtags: string | null;
-  thumbnailUrl: string | null;
-  clipUrl: string | null;
-  transcript: string | null;
-  /** The first Canva/Links "view" URL referenced by this task (e.g. an Instagram carousel slide design) — for non-clip content there's no Neon thumbnail to show, so this is a clickable "view design" link instead. */
-  viewLinkUrl: string | null;
-  /** Every physical copy (Drive file, YouTube upload, ...) of the source clip — a clip can live in more than one place, and the schedule should show all of them, not just the one representative link. Empty for non-clip-sourced tasks. */
-  copies: { path: string; platform: string | null; url: string }[];
-};
-
-/** Pulls the first "view: <url>" occurrence out of a Task's denormalized Linked URLs summary (e.g. "Slide 1 — view: https://... / edit: https://..."). */
-function firstViewLinkUrl(linkedUrls: string | undefined): string | null {
-  if (!linkedUrls) return null;
-  return linkedUrls.match(/view:\s*(\S+)/)?.[1] ?? null;
+/** @deprecated Replaced by Neon in Task 8. */
+export async function linkClipToExistingRawClipAction(
+  _clipId: string,
+  _rawClipRecordId: string
+): Promise<ClipLibraryRow | null> {
+  throw new Error("linkClipToExistingRawClipAction: Airtable removed — stub for Task 8");
 }
 
-/**
- * A task is either clip-sourced (its "Clip Source ID" holds the Neon clip_details.id it was
- * built from — the thumbnail, a representative openable link, and the full transcript all live
- * in Neon, populated by the AI analysis pipeline for nearly every clip) or not (a Canva-exported
- * carousel slide, etc. — its own Airtable "Thumbnail"/"Link" fields are the only source, and it
- * has no transcript). This resolves whichever applies, for every task regardless of channel —
- * not just TikTok.
- */
-export async function listTasksAction(): Promise<PlannerTask[]> {
-  await requireSession();
-  const tasks = await listAllTasks();
-
-  const clipSourceIds = [
-    ...new Set(
-      tasks
-        .map((t) => t.fields[FIELDS.tasks.clipSourceId])
-        .filter((id): id is string => !!id)
-    ),
-  ];
-  const [clipThumbnails, clipLinks, clipTranscripts, clipCopiesById] = await Promise.all([
-    getClipThumbnails(clipSourceIds),
-    getClipRepresentativeLinks(clipSourceIds),
-    getClipTranscripts(clipSourceIds),
-    listClipCopiesForIds(clipSourceIds),
-  ]);
-
-  return tasks.map((t) => {
-    const clipSourceId = t.fields[FIELDS.tasks.clipSourceId];
-    const thumbnailUrl =
-      (clipSourceId ? clipThumbnails[clipSourceId] : null) ??
-      t.fields[FIELDS.tasks.thumbnail]?.[0]?.thumbnails?.small?.url ??
-      t.fields[FIELDS.tasks.thumbnail]?.[0]?.url ??
-      null;
-    const clipPath = clipSourceId ? clipLinks[clipSourceId] : null;
-    const clipUrl = clipPath ? resolveCopyLink(clipPath) : (t.fields[FIELDS.tasks.link] ?? null);
-    const transcript = clipSourceId ? (clipTranscripts[clipSourceId] ?? null) : null;
-    const copies = (clipSourceId ? clipCopiesById[clipSourceId] : undefined) ?? [];
-    return {
-      id: t.id,
-      name: t.fields[FIELDS.tasks.name],
-      date: t.fields[FIELDS.tasks.date] ?? null,
-      channel: t.fields[FIELDS.tasks.channel] ?? null,
-      status: t.fields[FIELDS.tasks.status] ?? null,
-      fullContent: t.fields[FIELDS.tasks.fullContent] ?? null,
-      hook: t.fields[FIELDS.tasks.hook] ?? null,
-      hashtags: t.fields[FIELDS.tasks.hashtags] ?? null,
-      thumbnailUrl,
-      clipUrl,
-      transcript,
-      viewLinkUrl: firstViewLinkUrl(t.fields[FIELDS.tasks.linkedUrls]),
-      copies: copies.map((c) => ({ path: c.path, platform: c.platform, url: resolveCopyLink(c.path) })),
-    };
-  });
+/** @deprecated Replaced by Neon in Task 8. */
+export async function attachExistingCopyAction(
+  _clipId: string,
+  _copyRecordId: string
+): Promise<ClipLibraryRow | null> {
+  throw new Error("attachExistingCopyAction: Airtable removed — stub for Task 8");
 }
 
-/** The only write path from the Planner UI. Returns the status it just set — no need to round-trip it through Airtable's response, since a non-throwing PATCH already confirms the write. */
-export async function updateTaskStatusAction(taskId: string, status: string): Promise<string> {
-  await requireSession();
-  await updateTaskStatus(taskId, status);
-  return status;
+/** @deprecated Replaced by Neon in Task 8. */
+export async function createCopyAction(
+  _clipId: string,
+  _fields: { title: string; copyText: string; platform?: string }
+): Promise<ClipLibraryRow | null> {
+  throw new Error("createCopyAction: Airtable removed — stub for Task 8");
+}
+
+/** @deprecated Replaced by Neon in Task 8. */
+export async function searchCopiesAction(
+  _query: string
+): Promise<{ id: string; title: string; copyText: string; platform: string | null }[]> {
+  throw new Error("searchCopiesAction: Airtable removed — stub for Task 8");
 }
