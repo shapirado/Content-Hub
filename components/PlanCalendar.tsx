@@ -325,33 +325,45 @@ export function PlanCalendar({
 
   function handleStatusCycle(id: string, next: ContentTask["status"]) {
     startSaving(async () => {
-      const task = tasks.find((t) => t.id === id);
-      if (!task) return;
-      await updateContentTaskAction(id, {
-        hook: task.hook,
-        caption: task.caption,
-        hashtags: task.hashtags,
-        canva_url: task.canva_url,
-        live_url: task.live_url,
-        status: next,
-        scheduled_date: task.scheduled_date,
-        event_id: task.event_id,
-      });
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: next } : t)));
+      try {
+        const task = tasks.find((t) => t.id === id);
+        if (!task) return;
+        await updateContentTaskAction(id, {
+          hook: task.hook,
+          caption: task.caption,
+          hashtags: task.hashtags,
+          canva_url: task.canva_url,
+          live_url: task.live_url,
+          status: next,
+          scheduled_date: task.scheduled_date,
+          event_id: task.event_id,
+        });
+        setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: next } : t)));
+      } catch (err) {
+        console.error("Failed to update task status:", err);
+      }
     });
   }
 
   function handleUpdate(id: string, patch: ContentTaskPatch) {
     startSaving(async () => {
-      const updated = await updateContentTaskAction(id, patch);
-      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      try {
+        const updated = await updateContentTaskAction(id, patch);
+        setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      } catch (err) {
+        console.error("Failed to update task:", err);
+      }
     });
   }
 
   function handleDelete(id: string) {
     startSaving(async () => {
-      await deleteContentTaskAction(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
+      try {
+        await deleteContentTaskAction(id);
+        setTasks((prev) => prev.filter((t) => t.id !== id));
+      } catch (err) {
+        console.error("Failed to delete task:", err);
+      }
     });
   }
 
