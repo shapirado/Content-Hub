@@ -33,6 +33,7 @@ import {
   listContentTasksByDateRange,
   listClipsForPlanning,
   listWhatsappReviewsByProductType,
+  listEvents,
   type ClipLibraryRow,
   type ClipPerformanceUpsert,
   type ClipExportRow,
@@ -45,6 +46,7 @@ import {
   type ReviewForPlanning,
 } from "@/lib/neon";
 import { resolveCopyLink } from "@/lib/paths";
+import { buildContentPlanPrompt, callContentPlannerClaude, parseContentPlanResponse } from "@/lib/claude";
 
 async function requireSession() {
   const session = await auth();
@@ -277,6 +279,46 @@ export async function deleteContentTaskAction(id: string): Promise<void> {
 export async function listContentTasksByDateRangeAction(from: string, to: string): Promise<ContentTask[]> {
   await requireSession();
   return listContentTasksByDateRange(from, to);
+}
+
+// ---------------------------------------------------------------------------
+// AI Content Planner
+// ---------------------------------------------------------------------------
+
+export type GeneratePlanParams = {
+  from: string;
+  to: string;
+  eventIds: string[];
+};
+
+export async function generateContentPlanAction(
+  params: GeneratePlanParams
+): Promise<ContentTask[]> {
+  await requireSession();
+
+  const [clips, eventsAll, reviews] = await Promise.all([
+    listClipsForPlanning(),
+    listEvents(),
+    listWhatsappReviewsByProductType(null),
+  ]);
+
+  const events =
+    params.eventIds.length > 0
+      ? eventsAll.filter((e) => params.eventIds.includes(e.id))
+      : eventsAll.filter(
+          (e) => e.event_date >= params.from && e.event_date <= params.to
+        );
+
+  const prompt = buildContentPlanPrompt(clips, events, reviews, params.from, params.to);
+  const responseText = await callContentPlannerClaude(prompt);
+  const taskInputs = parseContentPlanResponse(responseText);
+
+  const created: ContentTask[] = [];
+  for (const input of taskInputs) {
+    const task = await createContentTask(input);
+    created.push(task);
+  }
+  return created;
 }
 
 // ---------------------------------------------------------------------------
