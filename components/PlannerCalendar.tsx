@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { updateTaskStatusAction, type PlannerTask } from "@/app/actions";
-import { OPTIONS } from "@/lib/airtable";
 import { InstagramIcon, TikTokIcon, WhatsAppIcon } from "@/components/icons";
 
 const DAY_LABELS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -43,13 +42,33 @@ function formatWeekRangeLabel(weekStart: Date): string {
   return `${startLabel}–${endLabel}`;
 }
 
-const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
-  "Not Started": { bg: "bg-surface-container-highest", fg: "text-on-surface-variant" },
-  "In Review": { bg: "bg-primary-container", fg: "text-on-primary-container" },
-  Approved: { bg: "bg-tertiary-container", fg: "text-on-tertiary-container" },
-  Cancelled: { bg: "bg-error-container", fg: "text-on-error-container" },
-  "Posted/Sent": { bg: "bg-secondary-container", fg: "text-on-secondary-container" },
+const TASK_STATUS_CYCLE: Array<"ai_draft" | "pending_review" | "approved" | "posted"> = [
+  "ai_draft",
+  "pending_review",
+  "approved",
+  "posted",
+];
+
+const STATUS_LABEL: Record<string, string> = {
+  ai_draft:       "טיוטת AI",
+  pending_review: "ממתינה לאישור",
+  approved:       "מאושרת",
+  posted:         "פורסמה",
 };
+
+const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
+  ai_draft:       { bg: "bg-surface-container-highest", fg: "text-on-surface-variant" },
+  pending_review: { bg: "bg-primary-container",         fg: "text-on-primary-container" },
+  approved:       { bg: "bg-tertiary-container",        fg: "text-on-tertiary-container" },
+  posted:         { bg: "bg-secondary-container",       fg: "text-on-secondary-container" },
+};
+
+function cycleStatus(current: string | null): string {
+  const idx = TASK_STATUS_CYCLE.indexOf(
+    current as "ai_draft" | "pending_review" | "approved" | "posted"
+  );
+  return TASK_STATUS_CYCLE[(idx + 1) % TASK_STATUS_CYCLE.length];
+}
 
 function StatusPill({
   status,
@@ -60,15 +79,12 @@ function StatusPill({
   onCycle: (next: string) => void;
   disabled: boolean;
 }) {
-  const current = status ?? "Not Started";
-  const style = STATUS_STYLE[current] ?? STATUS_STYLE["Not Started"];
-  const label = OPTIONS.taskStatus.find((s) => s.value === current)?.label ?? current;
+  const current = status ?? "ai_draft";
+  const style = STATUS_STYLE[current] ?? STATUS_STYLE["ai_draft"];
+  const label = STATUS_LABEL[current] ?? current;
 
   function cycle() {
-    const options = OPTIONS.taskStatus;
-    const currentIndex = options.findIndex((s) => s.value === current);
-    const next = options[(currentIndex + 1) % options.length];
-    onCycle(next.value);
+    onCycle(cycleStatus(current));
   }
 
   return (
@@ -92,7 +108,7 @@ function StatusPill({
 function TaskContent({ task }: { task: PlannerTask }) {
   const [expanded, setExpanded] = useState(false);
   const hookLines = task.hook ? task.hook.split("\n").map((l) => l.trim()).filter(Boolean) : [];
-  const fullContent = task.fullContent;
+  const fullContent = task.caption;
   const preview = fullContent && fullContent.length > 80 ? fullContent.slice(0, 80) + "..." : fullContent;
   const canExpand = (!!fullContent && fullContent.length > 80) || !!task.transcript;
 
@@ -157,7 +173,7 @@ function CopiesColumn({ copies }: { copies: PlannerTask["copies"] }) {
       {copies.map((c, i) => (
         <a
           key={i}
-          href={c.url}
+          href={c.url ?? undefined}
           target="_blank"
           rel="noopener noreferrer"
           title={c.path}
@@ -186,8 +202,8 @@ export function PlannerCalendar({
     const start = weekStart;
     const end = addDays(weekStart, 6);
     return tasks.filter((t) => {
-      if (!t.date) return false;
-      const date = parseDateKey(t.date);
+      if (!t.scheduled_date) return false;
+      const date = parseDateKey(t.scheduled_date);
       return date >= start && date <= end;
     });
   }, [tasks, weekStart]);
@@ -197,15 +213,15 @@ export function PlannerCalendar({
   function updateStatus(taskId: string, status: string) {
     startSaving(async () => {
       const newStatus = await updateTaskStatusAction(taskId, status);
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus as PlannerTask["status"] } : t)));
     });
   }
 
-  const tikTokTasks = weekTasks.filter((t) => t.channel === "TikTok");
-  const instagramTasks = weekTasks.filter((t) => t.channel === "Instagram");
-  const newsletterTasks = weekTasks.filter((t) => t.channel === "Rav-Masar");
+  const tikTokTasks = weekTasks.filter((t) => t.platform === "tiktok");
+  const instagramTasks = weekTasks.filter((t) => t.platform === "instagram");
+  const newsletterTasks = weekTasks.filter((t) => t.platform === "newsletter");
   const otherTasks = weekTasks.filter(
-    (t) => !["TikTok", "Instagram", "Rav-Masar"].includes(t.channel ?? "")
+    (t) => !["tiktok", "instagram", "newsletter"].includes(t.platform)
   );
 
   const hasInstagram = instagramTasks.length > 0;
@@ -260,33 +276,34 @@ export function PlannerCalendar({
           <div className="grid grid-cols-7 gap-2">
             {days.map((day, i) => {
               const dateKey = toDateKey(day);
-              const dayTasks = weekTasks.filter((t) => t.date === dateKey);
+              const dayTasks = weekTasks.filter((t) => t.scheduled_date === dateKey);
               return (
                 <div key={dateKey} className="rounded-2xl bg-surface-container-low p-2.5">
                   <div className="mb-1 text-[10px] text-on-surface-variant/60">{DAY_LABELS[i]}</div>
                   <div className="mb-2 text-sm font-bold text-on-surface">{day.getDate()}</div>
-                  {dayTasks.map((t) =>
-                    t.clipUrl ? (
+                  {dayTasks.map((t) => {
+                    const title = t.hook ?? t.caption ?? "(ללא כותרת)";
+                    return t.clipUrl ? (
                       <a
                         key={t.id}
                         href={t.clipUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mb-1 block truncate rounded bg-primary-fixed px-1.5 py-1 text-[10px] text-on-primary-fixed hover:opacity-80"
-                        title={t.name}
+                        title={title}
                       >
-                        {t.name}
+                        {title}
                       </a>
                     ) : (
                       <div
                         key={t.id}
                         className="mb-1 truncate rounded bg-primary-fixed px-1.5 py-1 text-[10px] text-on-primary-fixed"
-                        title={t.name}
+                        title={title}
                       >
-                        {t.name}
+                        {title}
                       </div>
-                    )
-                  )}
+                    );
+                  })}
                 </div>
               );
             })}
@@ -300,27 +317,26 @@ export function PlannerCalendar({
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <InstagramIcon className="h-6 w-6 text-primary" />
-                    <h3 className="text-headline-sm font-headline-sm text-on-surface">{t.name}</h3>
+                    <h3 className="text-headline-sm font-headline-sm text-on-surface">{t.hook ?? t.caption ?? "(ללא כותרת)"}</h3>
                   </div>
                   <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                 </div>
                 <div className="mb-3 flex items-center gap-2">
                   <span className="text-[11px] text-on-surface-variant">
-                    {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                    {t.scheduled_date ? `${DAY_LABELS[parseDateKey(t.scheduled_date).getDay()]} ${parseDateKey(t.scheduled_date).getDate()}` : ""}
                   </span>
-                  {t.viewLinkUrl && (
-                    <a
-                      href={t.viewLinkUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-bold text-primary hover:bg-primary/20"
-                    >
-                      <span className="material-symbols-outlined text-sm">palette</span>
-                      צפייה בעיצוב
-                    </a>
-                  )}
                 </div>
                 <TaskContent task={t} />
+                {t.canva_url && (
+                  <a
+                    href={t.canva_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    צפייה בעיצוב
+                  </a>
+                )}
               </div>
             ))}
           </section>
@@ -347,7 +363,7 @@ export function PlannerCalendar({
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={t.thumbnailUrl}
-                              alt={t.name}
+                              alt={t.hook ?? t.caption ?? "(ללא כותרת)"}
                               className="h-full w-full object-cover"
                             />
                           ) : (
@@ -373,10 +389,10 @@ export function PlannerCalendar({
                     })()}
                     <div className="min-w-0 flex-1">
                       <div className="mb-2 flex items-start justify-between gap-2">
-                        <span className="text-sm font-bold text-primary">{t.name}</span>
+                        <span className="text-sm font-bold text-primary">{t.hook ?? t.caption ?? "(ללא כותרת)"}</span>
                         <div className="flex shrink-0 items-center gap-2">
                           <span className="text-[11px] text-on-surface-variant">
-                            {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                            {t.scheduled_date ? `${DAY_LABELS[parseDateKey(t.scheduled_date).getDay()]} ${parseDateKey(t.scheduled_date).getDate()}` : ""}
                           </span>
                           <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                         </div>
@@ -404,9 +420,9 @@ export function PlannerCalendar({
                     <div className="mb-3 flex items-start justify-between gap-2">
                       <div>
                         <span className="text-xs font-bold text-primary">
-                          {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                          {t.scheduled_date ? `${DAY_LABELS[parseDateKey(t.scheduled_date).getDay()]} ${parseDateKey(t.scheduled_date).getDate()}` : ""}
                         </span>
-                        <h4 className="mt-0.5 text-base font-bold text-on-surface">{t.name}</h4>
+                        <h4 className="mt-0.5 text-base font-bold text-on-surface">{t.hook ?? t.caption ?? "(ללא כותרת)"}</h4>
                       </div>
                       <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                     </div>
@@ -425,19 +441,19 @@ export function PlannerCalendar({
             <div key={t.id} className="rounded-[32px] border border-outline-variant bg-surface-container-lowest p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  {t.channel?.startsWith("WhatsApp") ? (
+                  {t.platform?.startsWith("WhatsApp") ? (
                     <WhatsAppIcon className="h-6 w-6 text-primary" />
                   ) : (
                     <span className="material-symbols-outlined text-2xl text-primary">visibility</span>
                   )}
                   <div>
-                    <h3 className="text-headline-sm font-headline-sm text-on-surface">{t.name}</h3>
-                    <span className="text-[11px] text-on-surface-variant">{t.channel}</span>
+                    <h3 className="text-headline-sm font-headline-sm text-on-surface">{t.hook ?? t.caption ?? "(ללא כותרת)"}</h3>
+                    <span className="text-[11px] text-on-surface-variant">{t.platform}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-on-surface-variant">
-                    {t.date ? `${DAY_LABELS[parseDateKey(t.date).getDay()]} ${parseDateKey(t.date).getDate()}` : ""}
+                    {t.scheduled_date ? `${DAY_LABELS[parseDateKey(t.scheduled_date).getDay()]} ${parseDateKey(t.scheduled_date).getDate()}` : ""}
                   </span>
                   <StatusPill status={t.status} onCycle={(s) => updateStatus(t.id, s)} disabled={saving} />
                 </div>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { mergeClipDetailsAction, updateClipMetadataAction } from "@/app/actions";
-import { OPTIONS } from "@/lib/airtable";
+import { OPTIONS } from "@/lib/options";
 import { displayTitle, seasonIcon, type MergedClip } from "@/lib/types";
 import type { ClipDetails } from "@/lib/neon";
 

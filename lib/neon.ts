@@ -572,3 +572,144 @@ export async function repointRawClipId(
   `) as unknown as { clip_id: string }[];
   return rows.map((r) => r.clip_id);
 }
+
+// ─── Marketing Agency: New tables ──────────────────────────────────────────
+
+export type ContentTask = {
+  id: string;
+  clip_det_id: string | null;
+  event_id: string | null;
+  platform: "tiktok" | "instagram" | "newsletter";
+  scheduled_date: string;       // ISO date YYYY-MM-DD
+  status: "ai_draft" | "pending_review" | "approved" | "posted";
+  hook: string | null;
+  caption: string | null;
+  hashtags: string | null;
+  canva_url: string | null;
+  live_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Event = {
+  id: string;
+  name: string;
+  product_type: string;
+  event_date: string;           // ISO date YYYY-MM-DD
+  registration_link: string | null;
+  target_headcount: number | null;
+  price_early_bird: number | null;
+  price_regular: number | null;
+  location: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type WhatsappReview = {
+  id: string;
+  author_name: string | null;
+  text: string;
+  product_type: string | null;
+  created_at: string;
+};
+
+export type TaskPerformanceSnapshot = {
+  id: string;
+  task_id: string;
+  snapshot_date: string;
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  reach: number | null;
+  sends: number | null;
+  opens: number | null;
+  clicks: number | null;
+  unsubscribes: number | null;
+  created_at: string;
+};
+
+export type SnapshotData = Omit<TaskPerformanceSnapshot, "id" | "task_id" | "snapshot_date" | "created_at">;
+
+export async function listContentTasks(): Promise<ContentTask[]> {
+  const client = sql();
+  const rows = (await client`
+    SELECT id, clip_det_id, event_id, platform,
+           to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+           status, hook, caption, hashtags, canva_url, live_url, created_at, updated_at
+    FROM content_tasks
+    ORDER BY scheduled_date ASC, created_at ASC
+  `) as unknown as ContentTask[];
+  return rows;
+}
+
+export async function getContentTask(id: string): Promise<ContentTask | null> {
+  const client = sql();
+  const rows = (await client`
+    SELECT id, clip_det_id, event_id, platform,
+           to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+           status, hook, caption, hashtags, canva_url, live_url, created_at, updated_at
+    FROM content_tasks WHERE id = ${id}
+  `) as unknown as ContentTask[];
+  return rows[0] ?? null;
+}
+
+export async function updateContentTaskStatus(id: string, status: string): Promise<ContentTask> {
+  const client = sql();
+  const rows = (await client`
+    UPDATE content_tasks SET status = ${status}, updated_at = now()
+    WHERE id = ${id}
+    RETURNING id, clip_det_id, event_id, platform,
+              to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+              status, hook, caption, hashtags, canva_url, live_url, created_at, updated_at
+  `) as unknown as ContentTask[];
+  return rows[0];
+}
+
+export async function listEvents(): Promise<Event[]> {
+  const client = sql();
+  const rows = (await client`
+    SELECT id, name, product_type,
+           to_char(event_date, 'YYYY-MM-DD') AS event_date,
+           registration_link,
+           target_headcount, price_early_bird, price_regular, location, notes, created_at
+    FROM events
+    ORDER BY event_date ASC
+  `) as unknown as Event[];
+  return rows;
+}
+
+export async function upsertTaskPerformanceSnapshot(
+  taskId: string,
+  snapshotDate: string,
+  data: SnapshotData
+): Promise<TaskPerformanceSnapshot> {
+  const client = sql();
+  const rows = (await client`
+    INSERT INTO task_performance_snapshots
+      (task_id, snapshot_date, views, likes, comments, shares, saves, reach,
+       sends, opens, clicks, unsubscribes)
+    VALUES
+      (${taskId}, ${snapshotDate}, ${data.views ?? null}, ${data.likes ?? null},
+       ${data.comments ?? null}, ${data.shares ?? null}, ${data.saves ?? null},
+       ${data.reach ?? null}, ${data.sends ?? null}, ${data.opens ?? null},
+       ${data.clicks ?? null}, ${data.unsubscribes ?? null})
+    ON CONFLICT (task_id, snapshot_date) DO UPDATE SET
+      views        = EXCLUDED.views,
+      likes        = EXCLUDED.likes,
+      comments     = EXCLUDED.comments,
+      shares       = EXCLUDED.shares,
+      saves        = EXCLUDED.saves,
+      reach        = EXCLUDED.reach,
+      sends        = EXCLUDED.sends,
+      opens        = EXCLUDED.opens,
+      clicks       = EXCLUDED.clicks,
+      unsubscribes = EXCLUDED.unsubscribes
+    RETURNING id, task_id,
+              to_char(snapshot_date, 'YYYY-MM-DD') AS snapshot_date,
+              views, likes, comments, shares, saves, reach,
+              sends, opens, clicks, unsubscribes, created_at
+  `) as unknown as TaskPerformanceSnapshot[];
+  return rows[0];
+}

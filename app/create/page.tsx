@@ -1,13 +1,13 @@
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 
-export default function RawClipsPage() {
+export default function CreatePage() {
   return (
     <>
-      <Sidebar active="library" />
+      <Sidebar active="create" />
       <TopBar />
       <main className="mr-64 mt-16 flex min-h-[calc(100vh-64px)] items-center justify-center bg-background">
-        <p className="text-on-surface-variant">דף זה עובר שדרוג ויחזור בקרוב.</p>
+        <p className="text-on-surface-variant">יצירת תוכן — בקרוב.</p>
       </main>
     </>
   );

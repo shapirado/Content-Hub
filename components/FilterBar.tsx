@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { OPTIONS } from "@/lib/airtable";
+import { OPTIONS } from "@/lib/options";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
 import type { SortField, SortState } from "@/lib/types";
 
