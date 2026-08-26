@@ -152,7 +152,8 @@ export function PlanPageClient({
     <div className="flex gap-6">
       <div className="min-w-0 flex-1">
         <PlanCalendar
-          initialTasks={tasks}
+          tasks={tasks}
+          setTasks={setTasks}
           initialEvents={events}
           initialWeekStartKey={initialWeekStartKey}
           onGeneratePlanClick={() => setShowAIModal(true)}

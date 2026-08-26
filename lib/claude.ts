@@ -108,15 +108,24 @@ export function parseContentPlanResponse(text: string): ContentTaskInput[] {
   }
   if (!Array.isArray(parsed)) throw new Error("Claude response is not a JSON array");
 
-  return (parsed as Record<string, unknown>[]).map((item, i) => {
-    if (typeof item.platform !== "string") throw new Error(`Item ${i}: missing platform`);
-    if (typeof item.scheduled_date !== "string") throw new Error(`Item ${i}: missing scheduled_date`);
+  const PLATFORMS = ["tiktok", "instagram", "newsletter"] as const;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  return (parsed as unknown[]).map((raw, i) => {
+    if (typeof raw !== "object" || raw === null)
+      throw new Error(`Item ${i}: not an object`);
+    const item = raw as Record<string, unknown>;
+    if (typeof item.platform !== "string" || !PLATFORMS.includes(item.platform as (typeof PLATFORMS)[number]))
+      throw new Error(`Item ${i}: invalid platform "${String(item.platform)}"`);
+    if (typeof item.scheduled_date !== "string" || !DATE_RE.test(item.scheduled_date))
+      throw new Error(`Item ${i}: invalid scheduled_date "${String(item.scheduled_date)}"`);
     return {
       platform: item.platform as ContentTaskInput["platform"],
       scheduled_date: item.scheduled_date,
       status: "ai_draft" as const,
-      event_id: typeof item.event_id === "string" ? item.event_id : null,
-      clip_det_id: typeof item.clip_det_id === "string" ? item.clip_det_id : null,
+      event_id: typeof item.event_id === "string" && UUID_RE.test(item.event_id) ? item.event_id : null,
+      clip_det_id: typeof item.clip_det_id === "string" && UUID_RE.test(item.clip_det_id) ? item.clip_det_id : null,
       hook: typeof item.hook === "string" ? item.hook : null,
       caption: typeof item.caption === "string" ? item.caption : null,
       hashtags: typeof item.hashtags === "string" ? item.hashtags : null,

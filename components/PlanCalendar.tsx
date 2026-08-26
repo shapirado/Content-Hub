@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import React, { useState, useTransition, useMemo } from "react";
 import type { ContentTask, Event } from "@/lib/neon";
 import type { ContentTaskPatch } from "@/lib/neon";
 import { updateContentTaskAction, deleteContentTaskAction } from "@/app/actions";
@@ -290,17 +290,18 @@ function DayColumn({
 // ── Main PlanCalendar component ───────────────────────────────────────────────
 
 export function PlanCalendar({
-  initialTasks,
+  tasks,
+  setTasks,
   initialEvents,
   initialWeekStartKey,
   onGeneratePlanClick,
 }: {
-  initialTasks: ContentTask[];
+  tasks: ContentTask[];
+  setTasks: React.Dispatch<React.SetStateAction<ContentTask[]>>;
   initialEvents: Event[];
   initialWeekStartKey: string;
   onGeneratePlanClick: () => void;
 }) {
-  const [tasks, setTasks] = useState(initialTasks);
   const [weekStart, setWeekStart] = useState(() => parseDateKey(initialWeekStartKey));
   const [saving, startSaving] = useTransition();
 
