@@ -24,10 +24,25 @@ import {
   getClipsForExport,
   listContentTasks,
   updateContentTaskStatus,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  createContentTask,
+  updateContentTask,
+  deleteContentTask,
+  listContentTasksByDateRange,
+  listClipsForPlanning,
+  listWhatsappReviewsByProductType,
   type ClipLibraryRow,
   type ClipPerformanceUpsert,
   type ClipExportRow,
   type ContentTask,
+  type Event,
+  type EventInput,
+  type ContentTaskInput,
+  type ContentTaskPatch,
+  type ClipForPlanning,
+  type ReviewForPlanning,
 } from "@/lib/neon";
 import { resolveCopyLink } from "@/lib/paths";
 
@@ -215,6 +230,53 @@ export async function updateTaskStatusAction(taskId: string, status: string): Pr
   await requireSession();
   await updateContentTaskStatus(taskId, status);
   return status;
+}
+
+// ---------------------------------------------------------------------------
+// Events server actions
+// ---------------------------------------------------------------------------
+
+export async function createEventAction(data: EventInput): Promise<Event> {
+  await requireSession();
+  return createEvent(data);
+}
+
+export async function updateEventAction(id: string, data: EventInput): Promise<Event> {
+  await requireSession();
+  const result = await updateEvent(id, data);
+  if (!result) throw new Error(`Event ${id} not found`);
+  return result;
+}
+
+export async function deleteEventAction(id: string): Promise<void> {
+  await requireSession();
+  await deleteEvent(id);
+}
+
+// ---------------------------------------------------------------------------
+// ContentTask server actions
+// ---------------------------------------------------------------------------
+
+export async function createContentTaskAction(data: ContentTaskInput): Promise<ContentTask> {
+  await requireSession();
+  return createContentTask(data);
+}
+
+export async function updateContentTaskAction(id: string, patch: ContentTaskPatch): Promise<ContentTask> {
+  await requireSession();
+  const result = await updateContentTask(id, patch);
+  if (!result) throw new Error(`ContentTask ${id} not found`);
+  return result;
+}
+
+export async function deleteContentTaskAction(id: string): Promise<void> {
+  await requireSession();
+  await deleteContentTask(id);
+}
+
+export async function listContentTasksByDateRangeAction(from: string, to: string): Promise<ContentTask[]> {
+  await requireSession();
+  return listContentTasksByDateRange(from, to);
 }
 
 // ---------------------------------------------------------------------------

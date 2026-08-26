@@ -713,3 +713,185 @@ export async function upsertTaskPerformanceSnapshot(
   `) as unknown as TaskPerformanceSnapshot[];
   return rows[0];
 }
+
+// ---------------------------------------------------------------------------
+// Events CRUD
+// ---------------------------------------------------------------------------
+
+export type EventInput = Omit<Event, "id" | "created_at">;
+
+export async function createEvent(data: EventInput): Promise<Event> {
+  const client = sql();
+  const rows = (await client`
+    INSERT INTO events
+      (name, product_type, event_date, registration_link, target_headcount,
+       price_early_bird, price_regular, location, notes)
+    VALUES
+      (${data.name}, ${data.product_type}, ${data.event_date},
+       ${data.registration_link ?? null}, ${data.target_headcount ?? null},
+       ${data.price_early_bird ?? null}, ${data.price_regular ?? null},
+       ${data.location ?? null}, ${data.notes ?? null})
+    RETURNING id, name, product_type,
+              to_char(event_date, 'YYYY-MM-DD') AS event_date,
+              registration_link, target_headcount, price_early_bird,
+              price_regular, location, notes, created_at
+  `) as unknown as Event[];
+  return rows[0];
+}
+
+export async function updateEvent(id: string, data: EventInput): Promise<Event | null> {
+  const client = sql();
+  const rows = (await client`
+    UPDATE events SET
+      name              = ${data.name},
+      product_type      = ${data.product_type},
+      event_date        = ${data.event_date},
+      registration_link = ${data.registration_link ?? null},
+      target_headcount  = ${data.target_headcount ?? null},
+      price_early_bird  = ${data.price_early_bird ?? null},
+      price_regular     = ${data.price_regular ?? null},
+      location          = ${data.location ?? null},
+      notes             = ${data.notes ?? null}
+    WHERE id = ${id}
+    RETURNING id, name, product_type,
+              to_char(event_date, 'YYYY-MM-DD') AS event_date,
+              registration_link, target_headcount, price_early_bird,
+              price_regular, location, notes, created_at
+  `) as unknown as Event[];
+  return rows[0] ?? null;
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  const client = sql();
+  await client`DELETE FROM events WHERE id = ${id}`;
+}
+
+// ---------------------------------------------------------------------------
+// ContentTask CRUD
+// ---------------------------------------------------------------------------
+
+export type ContentTaskInput = Omit<ContentTask, "id" | "created_at" | "updated_at">;
+
+export type ContentTaskPatch = {
+  hook: string | null;
+  caption: string | null;
+  hashtags: string | null;
+  canva_url: string | null;
+  live_url: string | null;
+  status: ContentTask["status"];
+  scheduled_date: string;
+  event_id: string | null;
+};
+
+export async function createContentTask(data: ContentTaskInput): Promise<ContentTask> {
+  const client = sql();
+  const rows = (await client`
+    INSERT INTO content_tasks
+      (clip_det_id, event_id, platform, scheduled_date, status,
+       hook, caption, hashtags, canva_url, live_url)
+    VALUES
+      (${data.clip_det_id ?? null}, ${data.event_id ?? null}, ${data.platform},
+       ${data.scheduled_date}, ${data.status},
+       ${data.hook ?? null}, ${data.caption ?? null}, ${data.hashtags ?? null},
+       ${data.canva_url ?? null}, ${data.live_url ?? null})
+    RETURNING id, clip_det_id, event_id, platform,
+              to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+              status, hook, caption, hashtags, canva_url, live_url, created_at, updated_at
+  `) as unknown as ContentTask[];
+  return rows[0];
+}
+
+export async function updateContentTask(id: string, patch: ContentTaskPatch): Promise<ContentTask | null> {
+  const client = sql();
+  const rows = (await client`
+    UPDATE content_tasks SET
+      hook           = ${patch.hook},
+      caption        = ${patch.caption},
+      hashtags       = ${patch.hashtags},
+      canva_url      = ${patch.canva_url},
+      live_url       = ${patch.live_url},
+      status         = ${patch.status},
+      scheduled_date = ${patch.scheduled_date},
+      event_id       = ${patch.event_id},
+      updated_at     = now()
+    WHERE id = ${id}
+    RETURNING id, clip_det_id, event_id, platform,
+              to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+              status, hook, caption, hashtags, canva_url, live_url, created_at, updated_at
+  `) as unknown as ContentTask[];
+  return rows[0] ?? null;
+}
+
+export async function deleteContentTask(id: string): Promise<void> {
+  const client = sql();
+  await client`DELETE FROM content_tasks WHERE id = ${id}`;
+}
+
+export async function listContentTasksByDateRange(from: string, to: string): Promise<ContentTask[]> {
+  const client = sql();
+  const rows = (await client`
+    SELECT id, clip_det_id, event_id, platform,
+           to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+           status, hook, caption, hashtags, canva_url, live_url, created_at, updated_at
+    FROM content_tasks
+    WHERE scheduled_date >= ${from}::date AND scheduled_date <= ${to}::date
+    ORDER BY scheduled_date ASC, created_at ASC
+  `) as unknown as ContentTask[];
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// AI Planner data reads
+// ---------------------------------------------------------------------------
+
+export type ClipForPlanning = {
+  id: string;
+  title: string | null;
+  pillar: string | null;
+  season: string | null;
+  context_tags: string[];
+  summary: string | null;
+  hooks: string[];
+  wardrobe: string | null;
+  usable: string | null;
+  posted_to_tiktok: boolean | null;
+};
+
+export async function listClipsForPlanning(): Promise<ClipForPlanning[]> {
+  const client = sql();
+  const rows = (await client`
+    SELECT id, title, pillar, season, context_tags, summary, hooks, wardrobe, usable, posted_to_tiktok
+    FROM clip_details
+    WHERE usable = 'usable' OR usable IS NULL
+    ORDER BY created_at DESC
+  `) as unknown as ClipForPlanning[];
+  return rows;
+}
+
+export type ReviewForPlanning = {
+  id: string;
+  author_name: string | null;
+  text: string;
+  product_type: string | null;
+};
+
+export async function listWhatsappReviewsByProductType(productType: string | null): Promise<ReviewForPlanning[]> {
+  const client = sql();
+  if (productType) {
+    const rows = (await client`
+      SELECT id, author_name, text, product_type
+      FROM whatsapp_reviews
+      WHERE product_type = ${productType}
+      ORDER BY created_at DESC
+      LIMIT 20
+    `) as unknown as ReviewForPlanning[];
+    return rows;
+  }
+  const rows = (await client`
+    SELECT id, author_name, text, product_type
+    FROM whatsapp_reviews
+    ORDER BY created_at DESC
+    LIMIT 20
+  `) as unknown as ReviewForPlanning[];
+  return rows;
+}
