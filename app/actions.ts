@@ -531,7 +531,7 @@ export async function uploadToYouTubeAction(
 
   const videoPath = path.join(process.cwd(), "uploads", `${clipDetId}.mp4`);
   const { uploadToYouTube } = await import("@/lib/youtube");
-  const { videoUrl } = await uploadToYouTube({
+  const { videoId, videoUrl } = await uploadToYouTube({
     videoPath,
     title: uploadTitle,
     description: detail.org_whatsapp_text ?? youtubeTask.caption ?? "",
@@ -540,6 +540,22 @@ export async function uploadToYouTubeAction(
 
   await setTaskPosted(youtubeTask.id, videoUrl);
   await addYouTubeClipsCopy(clipDetId, videoUrl);
+
+  // Fetch YouTube's auto-generated thumbnail if the clip doesn't have one yet
+  if (!detail.thumbnail) {
+    try {
+      const thumbRes = await fetch(
+        `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+      );
+      if (thumbRes.ok) {
+        const buf = Buffer.from(await thumbRes.arrayBuffer());
+        const dataUri = `data:image/jpeg;base64,${buf.toString("base64")}`;
+        await updateClipThumbnail(clipDetId, dataUri);
+      }
+    } catch {
+      // non-fatal — clip works without thumbnail
+    }
+  }
 
   return { videoUrl };
 }
