@@ -946,10 +946,8 @@ export async function createMassarYom(data: {
   const displayTitle = data.originalFilename
     ? data.originalFilename.replace(/\.[^.]+$/, "")
     : data.youtubeTitle;
-  const clipsPlatform =
-    data.sourceType === "url" && /drive\.google\.com/i.test(data.videoPath)
-      ? "google_drive"
-      : null;
+  // URL copies (Drive links) carry no title or platform — those belong on clip_details
+  const clipsTitle = data.sourceType === "upload" ? displayTitle : null;
 
   await client`
     INSERT INTO clip_details
@@ -963,8 +961,8 @@ export async function createMassarYom(data: {
   `;
 
   await client`
-    INSERT INTO clips (clip_det_id, source_type, path, title, platform)
-    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${displayTitle}, ${clipsPlatform})
+    INSERT INTO clips (clip_det_id, source_type, path, title)
+    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${clipsTitle})
   `;
 
   await client`
@@ -1069,12 +1067,13 @@ export async function setTaskPosted(taskId: string, liveUrl: string): Promise<vo
 
 export async function addYouTubeClipsCopy(
   clipDetId: string,
-  youtubeUrl: string
+  youtubeUrl: string,
+  title?: string | null
 ): Promise<void> {
   const client = sql();
   await client`
-    INSERT INTO clips (clip_det_id, source_type, path, platform)
-    VALUES (${clipDetId}::uuid, 'url', ${youtubeUrl}, 'youtube')
+    INSERT INTO clips (clip_det_id, source_type, path, platform, title)
+    VALUES (${clipDetId}::uuid, 'url', ${youtubeUrl}, 'youtube', ${title ?? null})
   `;
 }
 

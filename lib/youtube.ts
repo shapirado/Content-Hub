@@ -171,8 +171,10 @@ export async function uploadToYouTube(params: {
   const videoId = json.id;
   if (!videoId) throw new Error("YouTube upload response missing video id");
 
-  // Add to "יהלומים" playlist (best-effort — doesn't fail the upload)
-  const playlistId = await findOrCreatePlaylist(accessToken, "יהלומים");
+  // Add to playlist (best-effort — doesn't fail the upload)
+  const playlistId =
+    process.env.YOUTUBE_PLAYLIST_ID ??
+    (await findOrCreatePlaylist(accessToken, "יהלומים"));
   if (playlistId) await addToPlaylist(accessToken, playlistId, videoId);
 
   return { videoId, videoUrl: `https://youtu.be/${videoId}` };

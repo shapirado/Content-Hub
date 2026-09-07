@@ -508,7 +508,7 @@ export async function createMassarYomAction(
 
   // When both a local file and a Drive URL were given, also store the Drive URL as a copy
   if (localFilePath && driveUrl && isGoogleDriveUrl) {
-    await addClipCopy(clipDetId, "url", driveUrl, "google_drive");
+    await addClipCopy(clipDetId, "url", driveUrl);
   }
 
   return { clipDetId };
@@ -546,7 +546,7 @@ export async function uploadToYouTubeAction(
   });
 
   await setTaskPosted(youtubeTask.id, videoUrl);
-  await addYouTubeClipsCopy(clipDetId, videoUrl);
+  await addYouTubeClipsCopy(clipDetId, videoUrl, uploadTitle);
 
   // Fetch YouTube's auto-generated thumbnail if the clip doesn't have one yet
   if (!detail.thumbnail) {
