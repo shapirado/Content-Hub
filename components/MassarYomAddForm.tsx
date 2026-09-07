@@ -127,7 +127,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
             ) : (
               <span className="flex items-center justify-between gap-2">
                 <span className="material-symbols-outlined text-sm text-on-surface-variant">upload_file</span>
-                <span className="text-on-surface-variant">בחר קובץ...</span>
+                <span className="text-on-surface-variant">בחירת קובץ...</span>
               </span>
             )}
           </button>
