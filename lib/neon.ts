@@ -946,8 +946,10 @@ export async function createMassarYom(data: {
   const displayTitle = data.originalFilename
     ? data.originalFilename.replace(/\.[^.]+$/, "")
     : data.youtubeTitle;
-  // URL copies (Drive links) carry no title or platform — those belong on clip_details
-  const clipsTitle = data.sourceType === "upload" ? displayTitle : null;
+  const clipsPlatform =
+    data.sourceType === "url" && /drive\.google\.com/i.test(data.videoPath)
+      ? "google_drive"
+      : null;
 
   await client`
     INSERT INTO clip_details
@@ -961,8 +963,8 @@ export async function createMassarYom(data: {
   `;
 
   await client`
-    INSERT INTO clips (clip_det_id, source_type, path, title)
-    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${clipsTitle})
+    INSERT INTO clips (clip_det_id, source_type, path, title, platform)
+    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${displayTitle}, ${clipsPlatform})
   `;
 
   await client`
