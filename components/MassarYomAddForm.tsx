@@ -21,19 +21,13 @@ const FILE_LOADING_MESSAGES = [
 
 const URL_LOADING_MESSAGES = ["מייצרת הוק והאשטגים...", "שומרת..."];
 
-function isLocalPath(v: string) {
-  return v.trim() && !v.trim().startsWith("http://") && !v.trim().startsWith("https://");
-}
-
-function isDriveUrl(v: string) {
-  return /drive\.google\.com/i.test(v.trim());
-}
 
 export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<"file" | "url">("url");
   const [scheduledDate, setScheduledDate] = useState("");
   const [caption, setCaption] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
+  const [localPath, setLocalPath] = useState("");
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [uploading, startUpload] = useTransition();
@@ -46,10 +40,8 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
     if (mode === "url" && !videoUrl.trim()) return;
 
     setError(null);
-    const messages =
-      mode === "file" || isLocalPath(videoUrl) || isDriveUrl(videoUrl)
-        ? FILE_LOADING_MESSAGES
-        : URL_LOADING_MESSAGES;
+    const hasLocalPath = mode === "url" && localPath.trim().length > 0;
+    const messages = mode === "file" || hasLocalPath ? FILE_LOADING_MESSAGES : URL_LOADING_MESSAGES;
     let msgIdx = 0;
     setLoadingMsg(messages[0]);
     const interval = setInterval(() => {
@@ -64,6 +56,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
           formData.set("videoFile", fileRef.current!.files![0]);
         } else {
           formData.set("videoUrl", videoUrl.trim());
+          if (localPath.trim()) formData.set("localPath", localPath.trim());
         }
         formData.set("scheduledDate", scheduledDate);
         formData.set("niritCaption", caption.trim());
@@ -99,19 +92,34 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
       </div>
 
       {mode === "url" ? (
-        <div key="url-input">
-          <label className="mb-1 block text-xs font-bold text-on-surface-variant">
-            קישור / נתיב קובץ מקומי *
-          </label>
-          <input
-            type="text"
-            value={videoUrl}
-            onChange={(e) => setVideoUrl(e.target.value)}
-            placeholder="https://drive.google.com/... או G:\My Drive\clip.mp4"
-            dir="ltr"
-            required
-            className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
-          />
+        <div key="url-input" className="space-y-2">
+          <div>
+            <label className="mb-1 block text-xs font-bold text-on-surface-variant">
+              קישור Google Drive (Copy link to clipboard) *
+            </label>
+            <input
+              type="text"
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder="https://drive.google.com/open?id=..."
+              dir="ltr"
+              required
+              className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-bold text-on-surface-variant">
+              נתיב קובץ מקומי (Shift+לחצן ימני ← Copy as path) – לתמלול ו-YouTube
+            </label>
+            <input
+              type="text"
+              value={localPath}
+              onChange={(e) => setLocalPath(e.target.value)}
+              placeholder={'"G:\\My Drive\\clip.mp4"'}
+              dir="ltr"
+              className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+            />
+          </div>
         </div>
       ) : (
         <div key="file-input">

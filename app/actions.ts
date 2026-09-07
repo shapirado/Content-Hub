@@ -427,11 +427,17 @@ export async function createMassarYomAction(
 
   const videoFile = formData.get("videoFile");
   const videoUrl = formData.get("videoUrl");
+  const localPathRaw = formData.get("localPath");
   const scheduledDate = formData.get("scheduledDate");
   const niritCaption = formData.get("niritCaption");
 
   const hasFile = videoFile instanceof File && videoFile.size > 0;
   const hasUrl = typeof videoUrl === "string" && videoUrl.trim().length > 0;
+  const driveUrl = hasUrl ? (videoUrl as string).trim() : null;
+  const localFilePath =
+    typeof localPathRaw === "string" && localPathRaw.trim()
+      ? localPathRaw.trim().replace(/^"(.*)"$/, "$1")
+      : null;
 
   if (!hasFile && !hasUrl) throw new Error("יש להעלות קובץ או להזין קישור");
   if (typeof scheduledDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
@@ -455,36 +461,32 @@ export async function createMassarYomAction(
     thumbnail = result.thumbnail;
     videoPath = `uploads/${clipDetId}.mp4`;
     sourceType = "upload";
+  } else if (localFilePath) {
+    // Local file path provided → full transcription + thumbnail pipeline
+    const fs = (await import("fs")).default;
+    const fileBuffer = Buffer.from(fs.readFileSync(localFilePath));
+    const { transcribeAndSave } = await import("@/lib/transcribe");
+    const result = await transcribeAndSave(fileBuffer, clipDetId);
+    transcript = result.transcript;
+    thumbnail = result.thumbnail;
+    videoPath = `uploads/${clipDetId}.mp4`;
+    sourceType = "upload";
   } else {
-    const rawInput = (videoUrl as string).trim().replace(/^"(.*)"$/, "$1");
-    const isLocalPath = !rawInput.startsWith("http://") && !rawInput.startsWith("https://");
-    if (isLocalPath) {
-      const fs = (await import("fs")).default;
-      const fileBuffer = Buffer.from(fs.readFileSync(rawInput));
-      const { transcribeAndSave } = await import("@/lib/transcribe");
-      const result = await transcribeAndSave(fileBuffer, clipDetId);
-      transcript = result.transcript;
-      thumbnail = result.thumbnail;
-      videoPath = `uploads/${clipDetId}.mp4`;
-      sourceType = "upload";
-    } else {
-      videoPath = rawInput;
-      sourceType = "url";
-      transcript = niritCaption.trim();
-    }
+    // Drive URL only → caption as transcript proxy
+    videoPath = driveUrl!;
+    sourceType = "url";
+    transcript = niritCaption.trim();
   }
 
   const { hook, tiktokHashtags, youtubeTitle, pillar, summary, tag } =
     await generateMassarYomContent(transcript, niritCaption.trim());
 
-  const rawVideoInput = hasFile ? null : (videoUrl as string).trim().replace(/^"(.*)"$/, "$1");
-  const isLocalPath = rawVideoInput
-    ? !rawVideoInput.startsWith("http://") && !rawVideoInput.startsWith("https://")
-    : false;
   const originalFilename = hasFile
     ? ((videoFile as File).name || null)
-    : (isLocalPath && rawVideoInput ? path.basename(rawVideoInput) || null : null);
-  const isGoogleDriveUrl = !hasFile && !isLocalPath && /drive\.google\.com/i.test(rawVideoInput ?? "");
+    : localFilePath
+    ? path.basename(localFilePath) || null
+    : null;
+  const isGoogleDriveUrl = !hasFile && driveUrl !== null && /drive\.google\.com/i.test(driveUrl);
 
   await createMassarYom({
     clipDetId,
@@ -503,6 +505,11 @@ export async function createMassarYomAction(
     originalFilename,
     googleDriveUploaded: isGoogleDriveUrl,
   });
+
+  // When both a local file and a Drive URL were given, also store the Drive URL as a copy
+  if (localFilePath && driveUrl && isGoogleDriveUrl) {
+    await addClipCopy(clipDetId, "url", driveUrl);
+  }
 
   return { clipDetId };
 }
