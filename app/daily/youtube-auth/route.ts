@@ -14,7 +14,7 @@ export async function GET() {
     client_id: clientId,
     redirect_uri: `${process.env.NEXTAUTH_URL ?? "http://localhost:3000"}/daily/youtube-auth/callback`,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/youtube.upload",
+    scope: "https://www.googleapis.com/auth/youtube",
     access_type: "offline",
     prompt: "consent",
   });

@@ -172,10 +172,6 @@ export async function listClipDetails(): Promise<ClipDetailsListItem[]> {
                  select platform from clips where clip_det_id = cd.id and platform is not null
                  union
                  select platform from clip_performance where clip_det_id = cd.id and platform is not null
-                 union
-                 select 'googledrive' where exists (
-                   select 1 from clips where clip_det_id = cd.id and source_type = 'upload'
-                 )
                ) p
              ),
              '{}'
@@ -296,13 +292,14 @@ export async function addClipCopy(
   clipDetId: string,
   sourceType: "upload" | "url",
   path: string,
-  platform?: string | null
+  platform?: string | null,
+  title?: string | null
 ): Promise<ClipCopy> {
   const client = sql();
   const rows = (await client`
-    insert into clips (clip_det_id, source_type, path, platform)
-    values (${clipDetId}, ${sourceType}, ${path}, ${platform ?? null})
-    on conflict (clip_det_id, path) do update set source_type = excluded.source_type, platform = excluded.platform
+    insert into clips (clip_det_id, source_type, path, platform, title)
+    values (${clipDetId}, ${sourceType}, ${path}, ${platform ?? null}, ${title ?? null})
+    on conflict (clip_det_id, path) do update set source_type = excluded.source_type, platform = excluded.platform, title = excluded.title
     returning id, clip_det_id, source_type, path, platform, title, created_at
   `) as unknown as ClipCopy[];
   return rows[0];
@@ -934,6 +931,7 @@ export async function createMassarYom(data: {
   scheduledDate: string;
   videoPath: string;
   sourceType: "upload" | "url";
+  driveUrl?: string | null;
   pillar: string;
   tag: string | null;
   thumbnail: string | null;
@@ -946,11 +944,6 @@ export async function createMassarYom(data: {
   const displayTitle = data.originalFilename
     ? data.originalFilename.replace(/\.[^.]+$/, "")
     : data.youtubeTitle;
-  const clipsPlatform =
-    data.sourceType === "url" && /drive\.google\.com/i.test(data.videoPath)
-      ? "google_drive"
-      : null;
-
   await client`
     INSERT INTO clip_details
       (id, title, transcript, summary, hooks, context_tags, usable, posted_to_tiktok,
@@ -960,11 +953,6 @@ export async function createMassarYom(data: {
        ${JSON.stringify([data.hook])}::jsonb, ARRAY[]::text[], 'usable', false,
        ${data.sourceType}, ${data.pillar}, ${data.tag}, ${data.thumbnail},
        ${data.niritCaption}, ${data.originalFilename}, ${googleDriveUploaded})
-  `;
-
-  await client`
-    INSERT INTO clips (clip_det_id, source_type, path, title, platform)
-    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${displayTitle}, ${clipsPlatform})
   `;
 
   await client`
@@ -1064,6 +1052,18 @@ export async function setTaskPosted(taskId: string, liveUrl: string): Promise<vo
   const client = sql();
   await client`
     UPDATE content_tasks SET status = 'posted', live_url = ${liveUrl} WHERE id = ${taskId}::uuid
+  `;
+}
+
+export async function addGoogleDriveClipsCopy(
+  clipDetId: string,
+  driveUrl: string,
+  title?: string | null
+): Promise<void> {
+  const client = sql();
+  await client`
+    INSERT INTO clips (clip_det_id, source_type, path, platform, title)
+    VALUES (${clipDetId}::uuid, 'url', ${driveUrl}, 'googledrive', ${title ?? null})
   `;
 }
 

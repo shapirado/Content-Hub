@@ -92,7 +92,7 @@ async function addToPlaylist(
   playlistId: string,
   videoId: string
 ): Promise<void> {
-  await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
+  const res = await fetch("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -105,6 +105,10 @@ async function addToPlaylist(
       },
     }),
   });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`YouTube playlist add failed ${res.status}: ${body.slice(0, 200)}`);
+  }
 }
 
 export async function uploadToYouTube(params: {
@@ -127,7 +131,7 @@ export async function uploadToYouTube(params: {
       tags,
     },
     status: {
-      privacyStatus: "public",
+      privacyStatus: "unlisted",
       selfDeclaredMadeForKids: false,
     },
   };

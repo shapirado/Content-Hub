@@ -41,6 +41,7 @@ import {
   setMassarYomChecklistFlag,
   setTaskPosted,
   addYouTubeClipsCopy,
+  addGoogleDriveClipsCopy,
   updateClipThumbnail,
   updateClipHooks,
   type ClipLibraryRow,
@@ -79,10 +80,11 @@ export async function addClipCopyAction(
   clipDetId: string,
   sourceType: "upload" | "url",
   path: string,
-  platform?: string | null
+  platform?: string | null,
+  title?: string | null
 ) {
   await requireSession();
-  return addClipCopy(clipDetId, sourceType, path, platform);
+  return addClipCopy(clipDetId, sourceType, path, platform, title);
 }
 
 export async function searchClipPathsAction(query: string, excludeClipDetId: string) {
@@ -422,24 +424,20 @@ export async function listMassarYomClipsAction(): Promise<MassarYomClip[]> {
 
 export async function createMassarYomAction(
   formData: FormData
-): Promise<{ clipDetId: string }> {
+): Promise<{ clipDetId: string; youtubeError: string | null }> {
   await requireSession();
 
   const videoFile = formData.get("videoFile");
-  const videoUrl = formData.get("videoUrl");
+  const videoUrlRaw = formData.get("videoUrl");
   const localPathRaw = formData.get("localPath");
   const scheduledDate = formData.get("scheduledDate");
   const niritCaption = formData.get("niritCaption");
 
-  const hasFile = videoFile instanceof File && videoFile.size > 0;
-  const hasUrl = typeof videoUrl === "string" && videoUrl.trim().length > 0;
-  const driveUrl = hasUrl ? (videoUrl as string).trim() : null;
-  const localFilePath =
-    typeof localPathRaw === "string" && localPathRaw.trim()
-      ? localPathRaw.trim().replace(/^"(.*)"$/, "$1")
+  const driveUrl =
+    typeof videoUrlRaw === "string" && videoUrlRaw.trim()
+      ? videoUrlRaw.trim()
       : null;
 
-  if (!hasFile && !hasUrl) throw new Error("יש להעלות קובץ או להזין קישור");
   if (typeof scheduledDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
     throw new Error("תאריך פרסום לא תקין");
   }
@@ -447,46 +445,45 @@ export async function createMassarYomAction(
     throw new Error("טקסט הפוסט חסר");
   }
 
-  const clipDetId = crypto.randomUUID();
-  let transcript = "";
-  let videoPath: string;
-  let sourceType: "upload" | "url";
-  let thumbnail: string | null = null;
+  // Build buffer + filename from whichever video source was provided
+  let buffer: Buffer;
+  let originalFilename: string;
 
-  if (hasFile) {
-    const buffer = Buffer.from(await (videoFile as File).arrayBuffer());
-    const { transcribeAndSave } = await import("@/lib/transcribe");
-    const result = await transcribeAndSave(buffer, clipDetId);
-    transcript = result.transcript;
-    thumbnail = result.thumbnail;
-    videoPath = `uploads/${clipDetId}.mp4`;
-    sourceType = "upload";
-  } else if (localFilePath) {
-    // Local file path provided → full transcription + thumbnail pipeline
-    const fs = (await import("fs")).default;
-    const fileBuffer = Buffer.from(fs.readFileSync(localFilePath));
-    const { transcribeAndSave } = await import("@/lib/transcribe");
-    const result = await transcribeAndSave(fileBuffer, clipDetId);
-    transcript = result.transcript;
-    thumbnail = result.thumbnail;
-    videoPath = `uploads/${clipDetId}.mp4`;
-    sourceType = "upload";
+  if (videoFile instanceof File && videoFile.size > 0) {
+    buffer = Buffer.from(await videoFile.arrayBuffer());
+    originalFilename = videoFile.name;
+  } else if (typeof localPathRaw === "string" && localPathRaw.trim()) {
+    const localPath = localPathRaw.trim().replace(/^"(.*)"$/, "$1");
+    const fsModule = (await import("fs")).default;
+    buffer = Buffer.from(fsModule.readFileSync(localPath));
+    originalFilename = path.basename(localPath);
   } else {
-    // Drive URL only → caption as transcript proxy
-    videoPath = driveUrl!;
-    sourceType = "url";
-    transcript = niritCaption.trim();
+    throw new Error("יש לספק קובץ וידאו או נתיב קובץ מקומי");
   }
 
-  const { hook, tiktokHashtags, youtubeTitle, pillar, summary, tag } =
-    await generateMassarYomContent(transcript, niritCaption.trim());
+  const clipDetId = crypto.randomUUID();
+  const displayTitle = originalFilename.replace(/\.[^.]+$/, "");
 
-  const originalFilename = hasFile
-    ? ((videoFile as File).name || null)
-    : localFilePath
-    ? path.basename(localFilePath) || null
-    : null;
-  const isGoogleDriveUrl = !hasFile && driveUrl !== null && /drive\.google\.com/i.test(driveUrl);
+  // Transcribe + write tmp mp4
+  const { transcribeAndSave } = await import("@/lib/transcribe");
+  const { transcript, thumbnail, videoPath } = await transcribeAndSave(buffer, clipDetId);
+
+  // YouTube upload + content generation in parallel
+  const { uploadToYouTube } = await import("@/lib/youtube");
+  const [youtubeResult, contentResult] = await Promise.allSettled([
+    uploadToYouTube({
+      videoPath,
+      title: displayTitle,
+      description: niritCaption.trim(),
+      hashtags: "",
+    }),
+    generateMassarYomContent(transcript, niritCaption.trim()),
+  ]);
+
+  if (contentResult.status === "rejected") throw contentResult.reason;
+  const { hook, tiktokHashtags, youtubeTitle, pillar, summary, tag } = contentResult.value;
+
+  const isGoogleDriveUrl = driveUrl !== null && /drive\.google\.com/i.test(driveUrl);
 
   await createMassarYom({
     clipDetId,
@@ -498,7 +495,8 @@ export async function createMassarYomAction(
     niritCaption: niritCaption.trim(),
     scheduledDate,
     videoPath,
-    sourceType,
+    sourceType: "upload",
+    driveUrl: isGoogleDriveUrl ? driveUrl : null,
     pillar,
     tag,
     thumbnail,
@@ -506,12 +504,22 @@ export async function createMassarYomAction(
     googleDriveUploaded: isGoogleDriveUrl,
   });
 
-  // When both a local file and a Drive URL were given, also store the Drive URL as a copy
-  if (localFilePath && driveUrl && isGoogleDriveUrl) {
-    await addClipCopy(clipDetId, "url", driveUrl, "google_drive");
+  if (isGoogleDriveUrl && driveUrl) {
+    await addGoogleDriveClipsCopy(clipDetId, driveUrl, displayTitle);
   }
 
-  return { clipDetId };
+  let youtubeError: string | null = null;
+  if (youtubeResult.status === "fulfilled") {
+    const { videoUrl } = youtubeResult.value;
+    await addYouTubeClipsCopy(clipDetId, videoUrl, displayTitle);
+    const clips = await listMassarYomClips();
+    const youtubeTask = clips.find((c) => c.id === clipDetId)?.tasks.find((t) => t.platform === "youtube");
+    if (youtubeTask) await setTaskPosted(youtubeTask.id, videoUrl);
+  } else {
+    youtubeError = (youtubeResult.reason as Error)?.message ?? "שגיאה לא ידועה";
+  }
+
+  return { clipDetId, youtubeError };
 }
 
 export async function uploadToYouTubeAction(
@@ -536,7 +544,12 @@ export async function uploadToYouTubeAction(
     : null;
   const uploadTitle = titleFromFilename ?? detail.title ?? "מסר יום";
 
-  const videoPath = path.join(process.cwd(), "uploads", `${clipDetId}.mp4`);
+  const os = await import("os");
+  const videoPath = path.join(os.default.tmpdir(), `${clipDetId}.mp4`);
+  const fsCheck = (await import("fs")).default;
+  if (!fsCheck.existsSync(videoPath)) {
+    throw new Error("קובץ הווידאו המקומי כבר לא זמין. יש ליצור את הקליפ מחדש.");
+  }
   const { uploadToYouTube } = await import("@/lib/youtube");
   const { videoId, videoUrl } = await uploadToYouTube({
     videoPath,

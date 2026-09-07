@@ -33,11 +33,8 @@ function extractThumbnail(inputPath: string, outputPath: string): Promise<void> 
 export async function transcribeAndSave(
   buffer: Buffer,
   clipDetId: string
-): Promise<{ transcript: string; thumbnail: string | null }> {
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  fs.mkdirSync(uploadsDir, { recursive: true });
-
-  const mp4Path = path.join(uploadsDir, `${clipDetId}.mp4`);
+): Promise<{ transcript: string; thumbnail: string | null; videoPath: string }> {
+  const mp4Path = path.join(os.tmpdir(), `${clipDetId}.mp4`);
   fs.writeFileSync(mp4Path, buffer);
 
   const wavPath = path.join(os.tmpdir(), `${clipDetId}.wav`);
@@ -95,7 +92,7 @@ export async function transcribeAndSave(
       try { fs.unlinkSync(thumbPath); } catch { /* ignore */ }
     }
 
-    return { transcript, thumbnail };
+    return { transcript, thumbnail, videoPath: mp4Path };
   } finally {
     try {
       fs.unlinkSync(wavPath);

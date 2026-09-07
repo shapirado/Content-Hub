@@ -11,7 +11,6 @@ import {
   listClipPerformanceAction,
   upsertClipPerformanceAction,
   searchClipPathsAction,
-  listKnownDriveFoldersAction,
   updateClipTranscriptAction,
   updateClipThumbnailAction,
   regenerateHookAction,
@@ -19,7 +18,7 @@ import {
 } from "@/app/actions";
 import { OPTIONS } from "@/lib/options";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
-import { isUrlPath, resolveCopyLink, KNOWN_DRIVE_FOLDERS, shortenFolderLabel } from "@/lib/paths";
+import { isUrlPath, resolveCopyLink } from "@/lib/paths";
 import type { ClipCopy, ClipDetails, ClipLibraryRow, ClipPathMatch, ClipPerformance } from "@/lib/neon";
 import { displayLink, displayTitle, seasonMatches, type MergedClip } from "@/lib/types";
 import { CopiesPanel } from "./CopiesPanel";
@@ -76,7 +75,6 @@ export function ExpandedClipDetails({
   const [saving, startSaving] = useTransition();
   const [copies, setCopies] = useState<ClipCopy[]>([]);
   const [newCopyPath, setNewCopyPath] = useState("");
-  const [knownFolders, setKnownFolders] = useState<string[]>(KNOWN_DRIVE_FOLDERS);
   const [editingCopyId, setEditingCopyId] = useState<string | null>(null);
   const [editPathInput, setEditPathInput] = useState("");
   const [performance, setPerformance] = useState<ClipPerformance[]>([]);
@@ -100,9 +98,6 @@ export function ExpandedClipDetails({
   useEffect(() => {
     listClipCopiesAction(item.clip.id).then(setCopies);
     listClipPerformanceAction(item.clip.id).then(setPerformance);
-    listKnownDriveFoldersAction().then((folders) =>
-      setKnownFolders([...new Set([...KNOWN_DRIVE_FOLDERS, ...folders])])
-    );
   }, [item.clip.id]);
 
   useEffect(() => {
@@ -252,7 +247,7 @@ export function ExpandedClipDetails({
     if (!path) return;
     const sourceType = isUrlPath(path) ? "url" : "upload";
     startSaving(async () => {
-      const copy = await addClipCopyAction(item.clip.id, sourceType, path);
+      const copy = await addClipCopyAction(item.clip.id, sourceType, path, undefined, item.clip.title ?? null);
       setCopies((prev) => [...prev, copy]);
       setNewCopyPath("");
     });
@@ -404,7 +399,7 @@ export function ExpandedClipDetails({
               )}
 
               {(() => {
-                const hasLocalUpload = copies.some((c) => c.path.startsWith("uploads/"));
+                const hasLocalUpload = copies.some((c) => c.path.startsWith("uploads/") || c.platform === "googledrive");
                 const hasYouTubeCopy = copies.some(
                   (c) => isUrlPath(c.path) && (c.path.includes("youtu.be") || c.path.includes("youtube.com"))
                 );
@@ -527,7 +522,6 @@ export function ExpandedClipDetails({
                           onCommit={() => saveEditPath(c.id)}
                           onCancel={() => setEditingCopyId(null)}
                           excludeClipDetId={item.clip.id}
-                          knownFolders={knownFolders}
                           disabled={saving}
                           autoFocus
                           commitOnBlur
@@ -613,7 +607,6 @@ export function ExpandedClipDetails({
                 onChange={setNewCopyPath}
                 onCommit={addCopy}
                 excludeClipDetId={item.clip.id}
-                knownFolders={knownFolders}
                 disabled={saving}
                 placeholder="נתיב ב-Drive או קישור ביוטיוב..."
               />
@@ -971,7 +964,6 @@ function PathAutocompleteInput({
   onCommit,
   onCancel,
   excludeClipDetId,
-  knownFolders,
   disabled,
   placeholder,
   autoFocus,
@@ -983,7 +975,6 @@ function PathAutocompleteInput({
   onCommit: () => void;
   onCancel?: () => void;
   excludeClipDetId: string;
-  knownFolders: string[];
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
@@ -1004,11 +995,6 @@ function PathAutocompleteInput({
     }, 250);
     return () => clearTimeout(timeout);
   }, [value, excludeClipDetId]);
-
-  const folderMatches =
-    !isUrlPath(value) && !value.includes("/")
-      ? knownFolders.filter((f) => shortenFolderLabel(f).toLowerCase().includes(value.trim().toLowerCase()))
-      : [];
 
   return (
     <div className="relative min-w-0 flex-1">
@@ -1041,29 +1027,8 @@ function PathAutocompleteInput({
         }
       />
 
-      {dropdownOpen && (folderMatches.length > 0 || pathMatches.length > 0) && (
+      {dropdownOpen && pathMatches.length > 0 && (
         <ul className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded border border-outline-variant bg-surface-container-lowest shadow-lg">
-          {folderMatches.length > 0 && (
-            <>
-              <li className="px-3 pt-1.5 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
-                תיקיות ידועות
-              </li>
-              {folderMatches.map((folder) => (
-                <li key={folder}>
-                  <button
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      onChange(folder + "/");
-                      setDropdownOpen(true);
-                    }}
-                    className="block w-full px-3 py-1.5 text-right text-xs text-on-surface hover:bg-surface-container"
-                  >
-                    {shortenFolderLabel(folder)}
-                  </button>
-                </li>
-              ))}
-            </>
-          )}
           {pathMatches.map((match) => (
             <li key={match.copyId}>
               <button
