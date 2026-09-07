@@ -27,6 +27,8 @@ export type ClipDetails = {
   usable: string | null;
   posted_to_tiktok: boolean | null;
   wardrobe: string | null;
+  org_whatsapp_text: string | null;
+  original_filename: string | null;
 };
 
 /** One physical copy of a clip_details row (a Drive file or a YouTube upload). `platform` (e.g. "instagram") records where that specific copy was posted, when known. `title` is an optional human-friendly label for this specific copy. */
@@ -189,7 +191,8 @@ export async function getClipDetails(id: string): Promise<ClipDetails | null> {
   const client = sql();
   const rows = (await client`
     select id, duration_seconds, language, transcript, summary, hooks, warning, created_at,
-           thumbnail, tag, title, pillar, season, context_tags, usable, posted_to_tiktok, wardrobe
+           thumbnail, tag, title, pillar, season, context_tags, usable, posted_to_tiktok, wardrobe,
+           org_whatsapp_text, original_filename
     from clip_details
     where id = ${id}
   `) as unknown as ClipDetails[];
@@ -402,7 +405,8 @@ export async function updateClipDetailsMetadata(
       wardrobe = ${merged.wardrobe}, posted_to_tiktok = ${merged.posted_to_tiktok}
     where id = ${id}
     returning id, duration_seconds, language, transcript, summary, hooks, warning, created_at,
-              thumbnail, tag, title, pillar, season, context_tags, usable, posted_to_tiktok, wardrobe
+              thumbnail, tag, title, pillar, season, context_tags, usable, posted_to_tiktok, wardrobe,
+              org_whatsapp_text, original_filename
   `) as unknown as ClipDetails[];
   return rows[0] ?? null;
 }
@@ -579,7 +583,7 @@ export type ContentTask = {
   id: string;
   clip_det_id: string | null;
   event_id: string | null;
-  platform: "tiktok" | "instagram" | "newsletter";
+  platform: "tiktok" | "instagram" | "newsletter" | "youtube";
   scheduled_date: string;       // ISO date YYYY-MM-DD
   status: "ai_draft" | "pending_review" | "approved" | "posted";
   hook: string | null;
@@ -893,5 +897,202 @@ export async function listWhatsappReviewsByProductType(productType: string | nul
     ORDER BY created_at DESC
     LIMIT 20
   `) as unknown as ReviewForPlanning[];
+  return rows;
+}
+
+// ─── Phase 1.5: מסר יום ────────────────────────────────────────────────────
+
+export type MassarYomTask = {
+  id: string;
+  platform: "tiktok" | "youtube";
+  scheduled_date: string;
+  status: string;
+  hook: string | null;
+  caption: string | null;
+  hashtags: string | null;
+  live_url: string | null;
+};
+
+export type MassarYomClip = {
+  id: string;
+  title: string | null;
+  hooks: string[];
+  created_at: string;
+  google_drive_uploaded: boolean;
+  website_added: boolean;
+  tasks: MassarYomTask[];
+};
+
+export async function createMassarYom(data: {
+  clipDetId: string;
+  youtubeTitle: string;
+  transcript: string;
+  summary: string;
+  hook: string;
+  tiktokHashtags: string;
+  niritCaption: string;
+  scheduledDate: string;
+  videoPath: string;
+  sourceType: "upload" | "url";
+  pillar: string;
+  tag: string | null;
+  thumbnail: string | null;
+  originalFilename: string | null;
+  googleDriveUploaded?: boolean;
+}): Promise<void> {
+  const client = sql();
+  const googleDriveUploaded = data.googleDriveUploaded ?? false;
+
+  await client`
+    INSERT INTO clip_details
+      (id, title, transcript, summary, hooks, context_tags, usable, posted_to_tiktok,
+       source_type, pillar, tag, thumbnail, org_whatsapp_text, original_filename, google_drive_uploaded)
+    VALUES
+      (${data.clipDetId}::uuid, ${data.youtubeTitle}, ${data.transcript}, ${data.summary},
+       ${JSON.stringify([data.hook])}::jsonb, ARRAY[]::text[], 'usable', false,
+       ${data.sourceType}, ${data.pillar}, ${data.tag}, ${data.thumbnail},
+       ${data.niritCaption}, ${data.originalFilename}, ${googleDriveUploaded})
+  `;
+
+  await client`
+    INSERT INTO clips (clip_det_id, source_type, path, title)
+    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${data.youtubeTitle})
+  `;
+
+  await client`
+    INSERT INTO content_tasks
+      (clip_det_id, event_id, platform, scheduled_date, status, hook, caption, hashtags)
+    VALUES
+      (${data.clipDetId}::uuid, null, 'tiktok', ${data.scheduledDate}::date,
+       'ai_draft', ${data.hook}, ${data.niritCaption}, ${data.tiktokHashtags}),
+      (${data.clipDetId}::uuid, null, 'youtube', ${data.scheduledDate}::date,
+       'ai_draft', ${data.hook}, ${data.niritCaption}, null)
+  `;
+}
+
+export async function listMassarYomClips(): Promise<MassarYomClip[]> {
+  const client = sql();
+
+  const clipRows = (await client`
+    SELECT cd.id, cd.title, cd.hooks,
+           to_char(cd.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at,
+           cd.google_drive_uploaded, cd.website_added
+    FROM clip_details cd
+    WHERE EXISTS (
+      SELECT 1 FROM content_tasks ct
+      WHERE ct.clip_det_id = cd.id AND ct.platform = 'youtube'
+    )
+    ORDER BY cd.created_at DESC
+  `) as unknown as Omit<MassarYomClip, "tasks">[];
+
+  if (clipRows.length === 0) return [];
+
+  const ids = clipRows.map((c) => c.id);
+
+  const taskRows = (await client`
+    SELECT id, clip_det_id, platform,
+           to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+           status, hook, caption, hashtags, live_url
+    FROM content_tasks
+    WHERE clip_det_id = ANY(${ids}::uuid[])
+      AND platform IN ('tiktok', 'youtube')
+    ORDER BY scheduled_date ASC
+  `) as unknown as (MassarYomTask & { clip_det_id: string })[];
+
+  const tasksByClip = new Map<string, MassarYomTask[]>();
+  for (const t of taskRows) {
+    const list = tasksByClip.get(t.clip_det_id) ?? [];
+    list.push({
+      id: t.id,
+      platform: t.platform as "tiktok" | "youtube",
+      scheduled_date: t.scheduled_date,
+      status: t.status,
+      hook: t.hook,
+      caption: t.caption,
+      hashtags: t.hashtags,
+      live_url: t.live_url,
+    });
+    tasksByClip.set(t.clip_det_id, list);
+  }
+
+  return clipRows.map((c) => ({
+    ...c,
+    tasks: tasksByClip.get(c.id) ?? [],
+  }));
+}
+
+export async function setMassarYomChecklistFlag(
+  clipDetId: string,
+  flag: "google_drive_uploaded" | "website_added",
+  value: boolean
+): Promise<void> {
+  const client = sql();
+  if (flag === "google_drive_uploaded") {
+    await client`
+      UPDATE clip_details SET google_drive_uploaded = ${value} WHERE id = ${clipDetId}::uuid
+    `;
+  } else {
+    await client`
+      UPDATE clip_details SET website_added = ${value} WHERE id = ${clipDetId}::uuid
+    `;
+  }
+}
+
+export async function updateClipThumbnail(clipDetId: string, thumbnail: string): Promise<void> {
+  const client = sql();
+  await client`
+    UPDATE clip_details SET thumbnail = ${thumbnail} WHERE id = ${clipDetId}::uuid
+  `;
+}
+
+export async function updateClipHooks(clipDetId: string, hooks: string[]): Promise<void> {
+  const client = sql();
+  await client`
+    UPDATE clip_details SET hooks = ${JSON.stringify(hooks)}::jsonb WHERE id = ${clipDetId}::uuid
+  `;
+}
+
+export async function setTaskPosted(taskId: string, liveUrl: string): Promise<void> {
+  const client = sql();
+  await client`
+    UPDATE content_tasks SET status = 'posted', live_url = ${liveUrl} WHERE id = ${taskId}::uuid
+  `;
+}
+
+export async function addYouTubeClipsCopy(
+  clipDetId: string,
+  youtubeUrl: string
+): Promise<void> {
+  const client = sql();
+  await client`
+    INSERT INTO clips (clip_det_id, source_type, path, platform)
+    VALUES (${clipDetId}::uuid, 'url', ${youtubeUrl}, 'youtube')
+  `;
+}
+
+export async function listRecentPostedTasks(
+  days: number,
+  limit: number
+): Promise<
+  { id: string; platform: string; scheduled_date: string; hook: string | null; caption: string | null }[]
+> {
+  const client = sql();
+  const rows = (await client`
+    SELECT id, platform,
+           to_char(scheduled_date, 'YYYY-MM-DD') AS scheduled_date,
+           hook, caption
+    FROM content_tasks
+    WHERE platform = 'tiktok'
+      AND status = 'posted'
+      AND scheduled_date >= current_date - (${days} || ' days')::interval
+    ORDER BY scheduled_date DESC
+    LIMIT ${limit}
+  `) as unknown as {
+    id: string;
+    platform: string;
+    scheduled_date: string;
+    hook: string | null;
+    caption: string | null;
+  }[];
   return rows;
 }

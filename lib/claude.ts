@@ -1,6 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ClipForPlanning, ReviewForPlanning, Event, ContentTaskInput } from "@/lib/neon";
 
+export type MassarYomContent = {
+  hook: string;
+  tiktokHashtags: string;
+  youtubeTitle: string;
+  pillar: string;
+  summary: string;
+  tag: string | null;
+};
+
 function client() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is not set");
@@ -108,7 +117,7 @@ export function parseContentPlanResponse(text: string): ContentTaskInput[] {
   }
   if (!Array.isArray(parsed)) throw new Error("Claude response is not a JSON array");
 
-  const PLATFORMS = ["tiktok", "instagram", "newsletter"] as const;
+  const PLATFORMS = ["tiktok", "instagram", "newsletter", "youtube"] as const;
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -135,14 +144,95 @@ export function parseContentPlanResponse(text: string): ContentTaskInput[] {
   });
 }
 
+export async function generateMassarYomContent(
+  transcript: string,
+  niritCaption: string
+): Promise<MassarYomContent> {
+  const anthropic = client();
+  const prompt = `יש לך תמלול של קליפ רוחני קצר של נירית שפירא ואת הפוסט המקורי שלה.
+
+תמלול הקליפ:
+"""
+${transcript}
+"""
+
+פוסט מקורי של נירית:
+"""
+${niritCaption}
+"""
+
+צרי פלט JSON בלבד עם השדות הבאים:
+- hook: שתי שורות פתיחה מושכות לטיקטוק (עד 80 תווים, עברית, pattern-interrupt)
+- tiktokHashtags: 5-7 האשטגים לטיקטוק (עברית ואנגלית, מופרדים ברווח)
+- youtubeTitle: כותרת קצרה ליוטיוב (עברית, עד 60 תווים)
+- pillar: עמוד תוכן אחד מהרשימה הבאה בדיוק כפי שכתוב: "Body & Sensation", "Consciousness Reframes", "Professional Identity", "Testimonial/Carousel"
+- summary: סיכום קצר של הסרטון במשפט אחד-שניים בעברית (מה הוא עוסק, לא לשחזר את ה-hook)
+- tag: אם התוכן קשור לחג, עונה, אירוע עם תאריך, או הזדמנות מוגבלת בזמן — ספקי תגית בפורמט "קטגוריה-פירוט" (דוגמאות: "חגים-ראש השנה", "חגים-פסח", "עונתי-קיץ", "אירועים-ריטריט"). אם התוכן כללי ועל-זמני — החזירי null.
+
+ללא טקסט נוסף לפני או אחרי ה-JSON.
+
+\`\`\`json
+{ "hook": "...", "tiktokHashtags": "...", "youtubeTitle": "...", "pillar": "...", "summary": "...", "tag": null }
+\`\`\``;
+
+  const message = await anthropic.messages
+    .stream({
+      model: "claude-sonnet-5",
+      max_tokens: 32000,
+      thinking: { type: "adaptive" },
+      messages: [{ role: "user", content: prompt }],
+    })
+    .finalMessage();
+
+  const block = message.content.find((b) => b.type === "text");
+  if (!block || block.type !== "text") {
+    throw new Error("Claude returned no text block for מסר יום content generation");
+  }
+
+  const cleaned = block.text.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    throw new Error(`Claude response is not valid JSON: ${cleaned.slice(0, 200)}`);
+  }
+
+  const p = parsed as Record<string, unknown>;
+  const VALID_PILLARS = ["Body & Sensation", "Consciousness Reframes", "Professional Identity", "Testimonial/Carousel"];
+  if (
+    typeof p.hook !== "string" ||
+    typeof p.tiktokHashtags !== "string" ||
+    typeof p.youtubeTitle !== "string" ||
+    typeof p.pillar !== "string" ||
+    typeof p.summary !== "string"
+  ) {
+    throw new Error(`Claude response missing required fields: ${cleaned.slice(0, 200)}`);
+  }
+
+  return {
+    hook: p.hook,
+    tiktokHashtags: p.tiktokHashtags,
+    youtubeTitle: p.youtubeTitle,
+    pillar: VALID_PILLARS.includes(p.pillar) ? p.pillar : "Consciousness Reframes",
+    summary: p.summary,
+    tag: typeof p.tag === "string" && p.tag.trim().length > 0 ? p.tag.trim() : null,
+  };
+}
+
 export async function callContentPlannerClaude(prompt: string): Promise<string> {
   const anthropic = client();
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 8096,
-    messages: [{ role: "user", content: prompt }],
-  });
+  const message = await anthropic.messages
+    .stream({
+      model: "claude-sonnet-5",
+      max_tokens: 32000,
+      thinking: { type: "adaptive" },
+      messages: [{ role: "user", content: prompt }],
+    })
+    .finalMessage();
   const block = message.content.find((b) => b.type === "text");
-  if (!block || block.type !== "text") throw new Error("Claude returned no text block");
+  if (!block || block.type !== "text") {
+    const types = message.content.map((b) => b.type).join(", ");
+    throw new Error(`Claude returned no text block (stop_reason: ${message.stop_reason}, blocks: [${types}])`);
+  }
   return block.text;
 }

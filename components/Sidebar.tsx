@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 
-type ActivePage = "library" | "planner" | "plan" | "create" | "review";
+type ActivePage = "library" | "planner" | "plan" | "create" | "review" | "daily";
 
 export async function Sidebar({ active = "library" }: { active?: ActivePage }) {
   const session = await auth();
@@ -12,6 +12,7 @@ export async function Sidebar({ active = "library" }: { active?: ActivePage }) {
     { href: "/plan",   key: "plan",    icon: "edit_calendar",  label: "תכנון תוכן" },
     { href: "/create", key: "create",  icon: "draw",           label: "יצירת תוכן" },
     { href: "/review", key: "review",  icon: "insert_chart",   label: "סקירת ביצועים" },
+    { href: "/daily",  key: "daily",   icon: "video_library",  label: "מסר יום" },
   ];
 
   return (

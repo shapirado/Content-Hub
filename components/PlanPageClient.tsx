@@ -5,6 +5,15 @@ import type { ContentTask, Event } from "@/lib/neon";
 import { PlanCalendar } from "@/components/PlanCalendar";
 import { EventsPanel } from "@/components/EventsPanel";
 import { generateContentPlanAction, type GeneratePlanParams } from "@/app/actions";
+import { DatePicker as AntDatePicker, ConfigProvider } from "antd";
+import he_IL from "antd/locale/he_IL";
+import dayjs, { type Dayjs } from "dayjs";
+import "dayjs/locale/he";
+import updateLocale from "dayjs/plugin/updateLocale";
+
+dayjs.extend(updateLocale);
+dayjs.locale("he");
+dayjs.updateLocale("he", { weekStart: 0 });
 
 function AIPlannerModal({
   events,
@@ -41,26 +50,28 @@ function AIPlannerModal({
       <div className="w-full max-w-md rounded-3xl bg-surface-container-low p-6 text-right">
         <h2 className="mb-4 text-lg font-bold text-on-surface">הפקת תוכנית AI</h2>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-bold text-on-surface-variant">מ-</label>
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
-              />
+          <ConfigProvider direction="rtl" locale={he_IL} theme={{ token: { borderRadius: 12, colorBorder: 'var(--color-outline-variant, #E2E8F0)', controlHeight: 40, colorPrimary: '#5a7a5a' } }}>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-bold text-on-surface-variant">מ-</label>
+                <AntDatePicker
+                  format="DD/MM/YYYY"
+                  className="w-full"
+                  value={from ? dayjs(from, "YYYY-MM-DD") : null}
+                  onChange={(d: Dayjs | null) => setFrom(d ? d.format("YYYY-MM-DD") : "")}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-on-surface-variant">עד-</label>
+                <AntDatePicker
+                  format="DD/MM/YYYY"
+                  className="w-full"
+                  value={to ? dayjs(to, "YYYY-MM-DD") : null}
+                  onChange={(d: Dayjs | null) => setTo(d ? d.format("YYYY-MM-DD") : "")}
+                />
+              </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-on-surface-variant">עד-</label>
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
-              />
-            </div>
-          </div>
+          </ConfigProvider>
           {upcomingEvents.length > 0 && (
             <div>
               <p className="mb-2 text-xs font-bold text-on-surface-variant">

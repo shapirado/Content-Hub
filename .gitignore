@@ -42,3 +42,8 @@ pat.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.superpowers/
+
+# uploaded video files (massar yom ingestion)
+/uploads/

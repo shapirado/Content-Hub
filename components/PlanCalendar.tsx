@@ -47,10 +47,12 @@ function daysUntil(eventDateKey: string): number {
 // ── Event colour ──────────────────────────────────────────────────────────────
 
 const PRODUCT_COLOR: Record<string, string> = {
-  "פשוט לאהוב": "bg-rose-100 text-rose-700 border-rose-200",
+  nature_retreat: "bg-rose-100 text-rose-700 border-rose-200",
   weekend_retreat: "bg-amber-100 text-amber-700 border-amber-200",
-  life_alignment_course: "bg-violet-100 text-violet-700 border-violet-200",
+  life_alignment_course: "bg-sky-100 text-sky-700 border-violet-200",
+  workshop: "bg-teal-100 text-teal-700 border-teal-200",
   large_event: "bg-sky-100 text-sky-700 border-sky-200",
+  retreat_abroad: "bg-amber-100 text-amber-800 border-indigo-200",
 };
 
 function eventColor(productType: string): string {
@@ -63,6 +65,21 @@ const PLATFORM_ICON: Record<string, string> = {
   tiktok: "smart_display",
   instagram: "photo_camera",
   newsletter: "mail",
+  youtube: "smart_display",
+};
+
+const PLATFORM_LABEL: Record<string, string> = {
+  tiktok: "TikTok",
+  instagram: "Instagram",
+  newsletter: "Newsletter",
+  youtube: "YouTube",
+};
+
+const PLATFORM_COLOR: Record<string, string> = {
+  tiktok: "bg-slate-100 text-slate-700",
+  instagram: "bg-pink-100 text-pink-700",
+  newsletter: "bg-amber-100 text-amber-700",
+  youtube: "bg-red-100 text-red-700",
 };
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -234,7 +251,7 @@ function PlanTaskCard({
 
 // ── Day column ────────────────────────────────────────────────────────────────
 
-const PLATFORM_ORDER: ContentTask["platform"][] = ["tiktok", "instagram", "newsletter"];
+const PLATFORM_ORDER: ContentTask["platform"][] = ["tiktok", "instagram", "newsletter", "youtube"];
 
 function DayColumn({
   date,

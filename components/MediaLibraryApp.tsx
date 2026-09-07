@@ -17,6 +17,7 @@ import { AssetGrid } from "./AssetGrid";
 import { SearchLinkModal } from "./SearchLinkModal";
 import { DeleteClipsModal } from "./DeleteClipsModal";
 import { MergeCopiesModal } from "./MergeCopiesModal";
+import { MassarYomAddForm } from "./MassarYomAddForm";
 
 type FullClip = ClipDetails;
 
@@ -46,6 +47,7 @@ export function MediaLibraryApp({
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [showAddMassarYom, setShowAddMassarYom] = useState(false);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -210,6 +212,15 @@ export function MediaLibraryApp({
   return (
     <div className="grid grid-cols-12 gap-8">
       <div className="col-span-12">
+        <div className="mb-4 flex items-center justify-between">
+          <button
+            onClick={() => setShowAddMassarYom(true)}
+            className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-bold text-on-primary hover:opacity-90"
+          >
+            <span className="material-symbols-outlined text-sm">add</span>
+            מסר יום חדש
+          </button>
+        </div>
         <FilterBar
           filters={filters}
           onChange={onFiltersChange}
@@ -343,6 +354,41 @@ export function MediaLibraryApp({
           onClose={() => setMergeOpen(false)}
           onMerged={handleMerged}
         />
+      )}
+
+      {/* מסר יום slide-in panel from the left */}
+      {showAddMassarYom && (
+        <div
+          className="fixed inset-0 z-50 flex"
+          dir="rtl"
+        >
+          {/* Backdrop */}
+          <div
+            className="flex-1 bg-black/40"
+            onClick={() => setShowAddMassarYom(false)}
+          />
+          {/* Panel — slides in from the left (visually right in RTL) */}
+          <div className="w-[420px] shrink-0 overflow-y-auto bg-surface shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-outline-variant bg-surface px-5 py-4">
+              <button
+                onClick={() => setShowAddMassarYom(false)}
+                className="text-on-surface-variant hover:text-on-surface"
+                aria-label="סגירה"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+              <h2 className="text-base font-bold text-on-surface">הוספת מסר יום</h2>
+            </div>
+            <div className="p-5">
+              <MassarYomAddForm
+                onDone={() => {
+                  setShowAddMassarYom(false);
+                  window.location.reload();
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

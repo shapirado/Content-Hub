@@ -13,6 +13,8 @@ import {
   searchClipPathsAction,
   listKnownDriveFoldersAction,
   updateClipTranscriptAction,
+  updateClipThumbnailAction,
+  regenerateHookAction,
 } from "@/app/actions";
 import { OPTIONS } from "@/lib/options";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
@@ -22,6 +24,24 @@ import { displayLink, displayTitle, seasonMatches, type MergedClip } from "@/lib
 import { CopiesPanel } from "./CopiesPanel";
 
 type FullClip = ClipDetails;
+
+function urlDisplayLabel(url: string): string {
+  try {
+    const { hostname, pathname } = new URL(url);
+    if (hostname === "drive.google.com") {
+      const seg = pathname.split("/").filter(Boolean);
+      if (seg[0] === "file") return "Google Drive";
+      if (seg[0] === "drive") return "Google Drive";
+      return "Google Drive";
+    }
+    if (hostname.includes("youtube.com") || hostname === "youtu.be") return "YouTube";
+    if (hostname.includes("tiktok.com")) return "TikTok";
+    if (hostname.includes("instagram.com")) return "Instagram";
+    return hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
 
 /** קופי לפרסום — hidden for now per user request, not removed. */
 const SHOW_COPIES_PANEL = false;
@@ -61,6 +81,13 @@ export function ExpandedClipDetails({
   const [performance, setPerformance] = useState<ClipPerformance[]>([]);
   const [addingLinkFor, setAddingLinkFor] = useState<string | null>(null);
   const [linkInput, setLinkInput] = useState("");
+  const [hooks, setHooks] = useState<string[]>(fullClip?.hooks ?? []);
+  const [regeneratingHook, startRegeneratingHook] = useTransition();
+  const [hookError, setHookError] = useState<string | null>(null);
+  const [replacingThumbnail, startReplacingThumbnail] = useTransition();
+  const [currentThumbnail, setCurrentThumbnail] = useState<string | null>(
+    item.clip.thumbnail ?? fullClip?.thumbnail ?? null
+  );
 
   const library = item.library;
   const thumbnail = item.clip.thumbnail ?? fullClip?.thumbnail ?? null;
@@ -74,6 +101,14 @@ export function ExpandedClipDetails({
       setKnownFolders([...new Set([...KNOWN_DRIVE_FOLDERS, ...folders])])
     );
   }, [item.clip.id]);
+
+  useEffect(() => {
+    if (fullClip) {
+      setHooks(fullClip.hooks);
+      if (!currentThumbnail) setCurrentThumbnail(fullClip.thumbnail);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullClip]);
 
   function startEditTranscript() {
     setTranscriptText(fullClip?.transcript ?? "");
@@ -89,6 +124,33 @@ export function ExpandedClipDetails({
 
   function cancelEditTranscript() {
     setEditingTranscript(false);
+  }
+
+  function regenerateHook() {
+    setHookError(null);
+    startRegeneratingHook(async () => {
+      try {
+        const result = await regenerateHookAction(item.clip.id);
+        setHooks([result.hook]);
+      } catch (err) {
+        setHookError(err instanceof Error ? err.message : "שגיאה לא ידועה");
+      }
+    });
+  }
+
+  function handleThumbnailFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUri = reader.result as string;
+      startReplacingThumbnail(async () => {
+        await updateClipThumbnailAction(item.clip.id, dataUri);
+        setCurrentThumbnail(dataUri);
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
   }
 
   function notifyPlatforms(nextCopies: ClipCopy[], nextPerformance: ClipPerformance[]) {
@@ -254,7 +316,13 @@ export function ExpandedClipDetails({
     <div className="col-span-12 grid grid-cols-12 gap-16 border-x border-b border-outline-variant bg-surface-container-low p-8">
       {/* Thumbnail + summary / hooks / transcript */}
       <div className="col-span-12 flex flex-col gap-6 sm:flex-row lg:col-span-7 lg:max-w-[calc(100%-200px)]">
-        <ClipThumbnail thumbnail={thumbnail} link={link} title={displayTitle(item)} />
+        <ClipThumbnail
+          thumbnail={currentThumbnail}
+          link={link}
+          title={displayTitle(item)}
+          onReplace={handleThumbnailFile}
+          replacing={replacingThumbnail}
+        />
 
         <div className="flex-1">
           {loadingDetail && !fullClip && (
@@ -274,18 +342,33 @@ export function ExpandedClipDetails({
                 )}
               </div>
 
-              {fullClip.hooks.length > 0 && (
+              {(hooks.length > 0 || fullClip) && (
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center justify-between">
                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary">
                       הצעות הוק
                     </h4>
-                    <span className="text-[10px] text-on-surface-variant/60">
-                      {fullClip.hooks.length} וריאציות
-                    </span>
+                    <div className="flex items-center gap-3">
+                      {hooks.length > 0 && (
+                        <span className="text-[10px] text-on-surface-variant/60">
+                          {hooks.length} וריאציות
+                        </span>
+                      )}
+                      <button
+                        onClick={regenerateHook}
+                        disabled={regeneratingHook}
+                        className="flex items-center gap-1 rounded-full border border-outline-variant px-2 py-0.5 text-[10px] font-bold text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
+                      >
+                        <span className="material-symbols-outlined text-xs">refresh</span>
+                        {regeneratingHook ? "מייצרת..." : "יצירת הוק מחדש"}
+                      </button>
+                    </div>
                   </div>
+                  {hookError && (
+                    <p className="text-[11px] text-error">{hookError}</p>
+                  )}
                   <div className="space-y-2">
-                    {fullClip.hooks.map((hook, i) => (
+                    {hooks.map((hook, i) => (
                       <div
                         key={i}
                         className="group flex items-center justify-between rounded border border-outline-variant/30 bg-surface-container-lowest p-3 transition-all hover:border-primary/50"
@@ -416,7 +499,13 @@ export function ExpandedClipDetails({
                           {c.title && (
                             <span className="block truncate font-bold text-on-surface">{c.title}</span>
                           )}
-                          <span className="block truncate" title={c.path}>{c.path}</span>
+                          <span className="block truncate" title={c.path}>
+                            {isUrlPath(c.path)
+                              ? urlDisplayLabel(c.path)
+                              : c.path.startsWith("uploads/")
+                              ? (fullClip?.original_filename ?? c.path)
+                              : c.path}
+                          </span>
                         </>
                       )}
                     </div>
@@ -443,7 +532,11 @@ export function ExpandedClipDetails({
                         })}
                       </div>
                       <a
-                        href={resolveCopyLink(c.path)}
+                        href={
+                          c.path.startsWith("uploads/") && fullClip?.original_filename
+                            ? `https://drive.google.com/drive/search?q=${encodeURIComponent(fullClip.original_filename)}`
+                            : resolveCopyLink(c.path)
+                        }
                         target="_blank"
                         rel="noopener noreferrer"
                         title={c.path}
@@ -761,13 +854,17 @@ function ClipThumbnail({
   thumbnail,
   link,
   title,
+  onReplace,
+  replacing,
 }: {
   thumbnail: string | null;
   link: string | null;
   title: string;
+  onReplace?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  replacing?: boolean;
 }) {
-  const content = (
-    <div className="flex h-64 w-40 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-high">
+  const imgEl = (
+    <div className="flex h-64 w-40 items-center justify-center overflow-hidden rounded-lg border border-outline-variant/30 bg-surface-container-high">
       {thumbnail ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={thumbnail} alt={title} className="h-full w-full object-cover" />
@@ -779,12 +876,39 @@ function ClipThumbnail({
     </div>
   );
 
-  if (!link) return content;
-
   return (
-    <a href={link} target="_blank" rel="noopener noreferrer" title="פתיחת הקליפ ביוטיוב">
-      {content}
-    </a>
+    <div className="group/thumb relative h-64 w-40 shrink-0">
+      {link ? (
+        <a href={link} target="_blank" rel="noopener noreferrer" title="פתיחת הקליפ ביוטיוב" className="block h-full w-full">
+          {imgEl}
+        </a>
+      ) : (
+        imgEl
+      )}
+      {onReplace && (
+        <label
+          className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg bg-black/50 opacity-0 transition-opacity group-hover/thumb:opacity-100"
+          title="החלפת תמונה ממוזערת"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {replacing ? (
+            <span className="material-symbols-outlined animate-spin text-white">autorenew</span>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-white">photo_camera</span>
+              <span className="text-[10px] font-bold text-white">החלפת תמונה</span>
+            </>
+          )}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={onReplace}
+            disabled={replacing}
+          />
+        </label>
+      )}
+    </div>
   );
 }
 

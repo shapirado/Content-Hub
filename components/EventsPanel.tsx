@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import type { Event } from "@/lib/neon";
 import type { EventInput } from "@/lib/neon";
+import { DatePicker as AntDatePicker, ConfigProvider } from "antd";
+import he_IL from "antd/locale/he_IL";
+import dayjs, { type Dayjs } from "dayjs";
+import "dayjs/locale/he";
+import updateLocale from "dayjs/plugin/updateLocale";
+
+dayjs.extend(updateLocale);
+dayjs.locale("he");
+dayjs.updateLocale("he", { weekStart: 0 });
 import {
   createEventAction,
   updateEventAction,
@@ -10,19 +19,23 @@ import {
 } from "@/app/actions";
 
 const PRODUCT_TYPE_LABELS: Record<string, string> = {
-  "פשוט לאהוב": "פשוט לאהוב",
+  nature_retreat: "פשוט לאהוב",
   weekend_retreat: "סוף שבוע של שינוי",
-  life_alignment_course: "קורס יישור מסלול",
+  life_alignment_course: "קורס מטפלים",
+  workshop: "סדנה",
   large_event: "אירוע גדול",
+  retreat_abroad: "ריטריט חול",
 };
 
 const PRODUCT_TYPE_OPTIONS = Object.keys(PRODUCT_TYPE_LABELS);
 
 const PRODUCT_COLOR: Record<string, string> = {
-  "פשוט לאהוב": "bg-rose-100 text-rose-700",
+  nature_retreat: "bg-rose-100 text-rose-700",
   weekend_retreat: "bg-amber-100 text-amber-700",
-  life_alignment_course: "bg-violet-100 text-violet-700",
+  life_alignment_course: "bg-sky-100 text-sky-700",
+  workshop: "bg-teal-100 text-teal-700",
   large_event: "bg-sky-100 text-sky-700",
+  retreat_abroad: "bg-amber-100 text-amber-800",
 };
 
 function daysUntil(dateKey: string): number {
@@ -42,7 +55,7 @@ function formatEventDate(dateKey: string): string {
 
 const EMPTY_FORM: EventInput = {
   name: "",
-  product_type: "פשוט לאהוב",
+  product_type: "nature_retreat",
   event_date: "",
   registration_link: null,
   target_headcount: null,
@@ -98,13 +111,14 @@ function EventForm({
       </div>
       <div>
         <label className="mb-1 block text-xs font-bold text-on-surface-variant">תאריך *</label>
-        <input
-          type="date"
-          value={form.event_date}
-          onChange={(e) => set("event_date", e.target.value)}
-          required
-          className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
-        />
+        <ConfigProvider direction="rtl" locale={he_IL} theme={{ token: { borderRadius: 12, colorBorder: 'var(--color-outline-variant, #E2E8F0)', controlHeight: 40, colorPrimary: '#5a7a5a' } }}>
+          <AntDatePicker
+            format="DD/MM/YYYY"
+            className="w-full"
+            value={form.event_date ? dayjs(form.event_date, "YYYY-MM-DD") : null}
+            onChange={(d: Dayjs | null) => set("event_date", d ? d.format("YYYY-MM-DD") : "")}
+          />
+        </ConfigProvider>
       </div>
       <div>
         <label className="mb-1 block text-xs font-bold text-on-surface-variant">מקום</label>
@@ -279,7 +293,11 @@ export function EventsPanel({
           return (
             <div key={ev.id} className="rounded-2xl border border-outline-variant bg-surface-container-low p-3 text-right">
               <div className="mb-1 flex items-start justify-between gap-2">
-                <div className="flex gap-1">
+                <div>
+                  <p className="text-sm font-bold text-on-surface">{ev.name}</p>
+                  <p className="text-[11px] text-on-surface-variant">{formatEventDate(ev.event_date)}</p>
+                </div>
+                <div className="flex shrink-0 gap-1">
                   <button
                     onClick={() => openEdit(ev)}
                     disabled={saving}
@@ -297,12 +315,8 @@ export function EventsPanel({
                     <span className="material-symbols-outlined text-base">delete</span>
                   </button>
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-on-surface">{ev.name}</p>
-                  <p className="text-[11px] text-on-surface-variant">{formatEventDate(ev.event_date)}</p>
-                </div>
               </div>
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-start gap-2">
                 <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${PRODUCT_COLOR[ev.product_type] ?? "bg-surface-container text-on-surface-variant"}`}>
                   {PRODUCT_TYPE_LABELS[ev.product_type] ?? ev.product_type}
                 </span>

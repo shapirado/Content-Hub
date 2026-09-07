@@ -1,6 +1,8 @@
 "use server";
 
 import { auth } from "@/auth";
+import path from "path";
+import crypto from "crypto";
 import {
   getClipDetails,
   getClipRepresentativeLinks,
@@ -34,6 +36,13 @@ import {
   listClipsForPlanning,
   listWhatsappReviewsByProductType,
   listEvents,
+  createMassarYom,
+  listMassarYomClips,
+  setMassarYomChecklistFlag,
+  setTaskPosted,
+  addYouTubeClipsCopy,
+  updateClipThumbnail,
+  updateClipHooks,
   type ClipLibraryRow,
   type ClipPerformanceUpsert,
   type ClipExportRow,
@@ -44,7 +53,9 @@ import {
   type ContentTaskPatch,
   type ClipForPlanning,
   type ReviewForPlanning,
+  type MassarYomClip,
 } from "@/lib/neon";
+import { generateMassarYomContent } from "@/lib/claude";
 import { resolveCopyLink } from "@/lib/paths";
 import { buildContentPlanPrompt, callContentPlannerClaude, parseContentPlanResponse } from "@/lib/claude";
 
@@ -165,7 +176,7 @@ export async function exportClipsAction(clipIds: string[]): Promise<ClipExportRo
 
 export type PlannerTask = {
   id: string;
-  platform: "tiktok" | "instagram" | "newsletter";
+  platform: "tiktok" | "instagram" | "newsletter" | "youtube";
   scheduled_date: string;    // ISO date YYYY-MM-DD
   status: "ai_draft" | "pending_review" | "approved" | "posted";
   hook: string | null;
@@ -398,4 +409,181 @@ export async function searchCopiesAction(
   _query: string
 ): Promise<{ id: string; title: string; copyText: string; platform: string | null }[]> {
   throw new Error("searchCopiesAction: Airtable removed — stub for Task 8");
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.5: מסר יום actions
+// ---------------------------------------------------------------------------
+
+export async function listMassarYomClipsAction(): Promise<MassarYomClip[]> {
+  await requireSession();
+  return listMassarYomClips();
+}
+
+export async function createMassarYomAction(
+  formData: FormData
+): Promise<{ clipDetId: string }> {
+  await requireSession();
+
+  const videoFile = formData.get("videoFile");
+  const videoUrl = formData.get("videoUrl");
+  const scheduledDate = formData.get("scheduledDate");
+  const niritCaption = formData.get("niritCaption");
+
+  const hasFile = videoFile instanceof File && videoFile.size > 0;
+  const hasUrl = typeof videoUrl === "string" && videoUrl.trim().length > 0;
+
+  if (!hasFile && !hasUrl) throw new Error("יש להעלות קובץ או להזין קישור");
+  if (typeof scheduledDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
+    throw new Error("תאריך פרסום לא תקין");
+  }
+  if (typeof niritCaption !== "string" || !niritCaption.trim()) {
+    throw new Error("טקסט הפוסט חסר");
+  }
+
+  const clipDetId = crypto.randomUUID();
+  let transcript = "";
+  let videoPath: string;
+  let sourceType: "upload" | "url";
+  let thumbnail: string | null = null;
+
+  if (hasFile) {
+    const buffer = Buffer.from(await (videoFile as File).arrayBuffer());
+    const { transcribeAndSave } = await import("@/lib/transcribe");
+    const result = await transcribeAndSave(buffer, clipDetId);
+    transcript = result.transcript;
+    thumbnail = result.thumbnail;
+    videoPath = `uploads/${clipDetId}.mp4`;
+    sourceType = "upload";
+  } else {
+    const rawInput = (videoUrl as string).trim();
+    const isLocalPath = !rawInput.startsWith("http://") && !rawInput.startsWith("https://");
+    if (isLocalPath) {
+      const fs = (await import("fs")).default;
+      const fileBuffer = Buffer.from(fs.readFileSync(rawInput));
+      const { transcribeAndSave } = await import("@/lib/transcribe");
+      const result = await transcribeAndSave(fileBuffer, clipDetId);
+      transcript = result.transcript;
+      thumbnail = result.thumbnail;
+      videoPath = `uploads/${clipDetId}.mp4`;
+      sourceType = "upload";
+    } else {
+      videoPath = rawInput;
+      sourceType = "url";
+      // No video to transcribe — use Nirit's caption as the transcript proxy
+      transcript = niritCaption.trim();
+    }
+  }
+
+  const { hook, tiktokHashtags, youtubeTitle, pillar, summary, tag } =
+    await generateMassarYomContent(transcript, niritCaption.trim());
+
+  const rawVideoInput = hasFile ? null : (videoUrl as string).trim();
+  const isLocalPath = rawVideoInput
+    ? !rawVideoInput.startsWith("http://") && !rawVideoInput.startsWith("https://")
+    : false;
+  const originalFilename = hasFile
+    ? ((videoFile as File).name || null)
+    : isLocalPath && rawVideoInput
+    ? path.basename(rawVideoInput) || null
+    : null;
+  const isGoogleDriveUrl = !hasFile && !isLocalPath && /drive\.google\.com/i.test(rawVideoInput ?? "");
+
+  await createMassarYom({
+    clipDetId,
+    youtubeTitle,
+    transcript,
+    summary,
+    hook,
+    tiktokHashtags,
+    niritCaption: niritCaption.trim(),
+    scheduledDate,
+    videoPath,
+    sourceType,
+    pillar,
+    tag,
+    thumbnail,
+    originalFilename,
+    googleDriveUploaded: isGoogleDriveUrl,
+  });
+
+  return { clipDetId };
+}
+
+export async function uploadToYouTubeAction(
+  clipDetId: string
+): Promise<{ videoUrl: string }> {
+  await requireSession();
+
+  const detail = await getClipDetails(clipDetId);
+  if (!detail) throw new Error("קליפ לא נמצא");
+
+  const clips = await listMassarYomClips();
+  const clip = clips.find((c) => c.id === clipDetId);
+  if (!clip) throw new Error("קליפ לא נמצא");
+
+  const youtubeTask = clip.tasks.find((t) => t.platform === "youtube");
+  if (!youtubeTask) throw new Error("משימת YouTube לא נמצאה לקליפ זה");
+
+  // Title: original filename without extension; fall back to Claude-generated title
+  const rawFilename = detail.original_filename ?? null;
+  const titleFromFilename = rawFilename
+    ? rawFilename.replace(/\.[^.]+$/, "")
+    : null;
+  const uploadTitle = titleFromFilename ?? detail.title ?? "מסר יום";
+
+  const videoPath = path.join(process.cwd(), "uploads", `${clipDetId}.mp4`);
+  const { uploadToYouTube } = await import("@/lib/youtube");
+  const { videoUrl } = await uploadToYouTube({
+    videoPath,
+    title: uploadTitle,
+    description: detail.org_whatsapp_text ?? youtubeTask.caption ?? "",
+    hashtags: youtubeTask.hashtags ?? "",
+  });
+
+  await setTaskPosted(youtubeTask.id, videoUrl);
+  await addYouTubeClipsCopy(clipDetId, videoUrl);
+
+  return { videoUrl };
+}
+
+export async function markTaskPostedAction(
+  taskId: string,
+  liveUrl: string
+): Promise<void> {
+  await requireSession();
+  await setTaskPosted(taskId, liveUrl);
+}
+
+export async function setChecklistFlagAction(
+  clipDetId: string,
+  flag: "google_drive_uploaded" | "website_added",
+  value: boolean
+): Promise<void> {
+  await requireSession();
+  await setMassarYomChecklistFlag(clipDetId, flag, value);
+}
+
+export async function updateClipThumbnailAction(
+  clipDetId: string,
+  thumbnailDataUri: string
+): Promise<void> {
+  await requireSession();
+  await updateClipThumbnail(clipDetId, thumbnailDataUri);
+}
+
+export async function regenerateHookAction(
+  clipDetId: string
+): Promise<{ hook: string; tiktokHashtags: string; youtubeTitle: string }> {
+  await requireSession();
+  const detail = await getClipDetails(clipDetId);
+  if (!detail) throw new Error("קליפ לא נמצא");
+  const transcript = detail.transcript ?? "";
+  const niritCaption = detail.org_whatsapp_text ?? "";
+  const { hook, tiktokHashtags, youtubeTitle } = await generateMassarYomContent(
+    transcript,
+    niritCaption
+  );
+  await updateClipHooks(clipDetId, [hook]);
+  return { hook, tiktokHashtags, youtubeTitle };
 }
