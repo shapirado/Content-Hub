@@ -452,13 +452,8 @@ export async function createMassarYomAction(
   if (videoFile instanceof File && videoFile.size > 0) {
     buffer = Buffer.from(await videoFile.arrayBuffer());
     originalFilename = videoFile.name;
-  } else if (typeof localPathRaw === "string" && localPathRaw.trim()) {
-    const localPath = localPathRaw.trim().replace(/^"(.*)"$/, "$1");
-    const fsModule = (await import("fs")).default;
-    buffer = Buffer.from(fsModule.readFileSync(localPath));
-    originalFilename = path.basename(localPath);
   } else {
-    throw new Error("יש לספק קובץ וידאו או נתיב קובץ מקומי");
+    throw new Error("יש לספק קובץ וידאו");
   }
 
   const clipDetId = crypto.randomUUID();

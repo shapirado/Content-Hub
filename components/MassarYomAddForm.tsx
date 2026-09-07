@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { DatePicker as AntDatePicker, ConfigProvider } from "antd";
 import he_IL from "antd/locale/he_IL";
 import dayjs, { type Dayjs } from "dayjs";
@@ -20,9 +20,10 @@ const LOADING_MESSAGES = [
   "שומרת...",
 ];
 
+const DIR_HANDLE_KEY = "massarYom_lastDirHandle";
+
 export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
-  const [mode, setMode] = useState<"path" | "file">("path");
-  const [localPath, setLocalPath] = useState("");
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [caption, setCaption] = useState("");
@@ -30,13 +31,49 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [youtubeWarning, setYoutubeWarning] = useState<string | null>(null);
   const [uploading, startUpload] = useTransition();
+
+  // Fallback for browsers that don't support showOpenFilePicker
   const fileRef = useRef<HTMLInputElement>(null);
+  const supportsFilePicker = typeof window !== "undefined" && "showOpenFilePicker" in window;
+
+  // Persist last-used directory handle in sessionStorage (IndexedDB would survive across tabs
+  // but FileSystemDirectoryHandle can't be JSON-serialised — we keep the handle in memory
+  // across re-renders via a ref and restore from the browser's own picker memory otherwise)
+  const lastDirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+
+  async function pickFile() {
+    try {
+      const opts: OpenFilePickerOptions = {
+        types: [{ description: "Video", accept: { "video/*": [".mp4", ".mov", ".m4v"] } }],
+        multiple: false,
+      };
+      if (lastDirHandleRef.current) {
+        (opts as Record<string, unknown>).startIn = lastDirHandleRef.current;
+      }
+      const [handle] = await window.showOpenFilePicker(opts);
+      // Remember the parent directory for next time
+      try {
+        // @ts-expect-error — non-standard but works in Chrome
+        const dir = await handle.getParent?.();
+        if (dir) lastDirHandleRef.current = dir;
+      } catch { /* ignore */ }
+      const file = await handle.getFile();
+      setPickedFile(file);
+    } catch (err) {
+      // User cancelled — not an error
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      console.error("showOpenFilePicker failed:", err);
+    }
+  }
+
+  function handleFallbackChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setPickedFile(e.target.files?.[0] ?? null);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!scheduledDate || !caption.trim()) return;
-    if (mode === "path" && !localPath.trim()) return;
-    if (mode === "file" && !fileRef.current?.files?.[0]) return;
+    if (!pickedFile) return;
 
     setError(null);
     setYoutubeWarning(null);
@@ -50,11 +87,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
     startUpload(async () => {
       try {
         const formData = new FormData();
-        if (mode === "file") {
-          formData.set("videoFile", fileRef.current!.files![0]);
-        } else {
-          formData.set("localPath", localPath.trim());
-        }
+        formData.set("videoFile", pickedFile);
         if (videoUrl.trim()) formData.set("videoUrl", videoUrl.trim());
         formData.set("scheduledDate", scheduledDate);
         formData.set("niritCaption", caption.trim());
@@ -75,54 +108,40 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 text-right">
-      {/* Mode toggle */}
-      <div className="flex rounded-xl border border-outline-variant overflow-hidden text-sm">
-        <button
-          type="button"
-          onClick={() => setMode("path")}
-          className={`flex-1 py-2 font-bold transition-colors ${mode === "path" ? "bg-primary text-on-primary" : "bg-surface text-on-surface-variant hover:bg-surface-container"}`}
-        >
-          נתיב קובץ
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("file")}
-          className={`flex-1 py-2 font-bold transition-colors ${mode === "file" ? "bg-primary text-on-primary" : "bg-surface text-on-surface-variant hover:bg-surface-container"}`}
-        >
-          העלאת קובץ
-        </button>
-      </div>
-
-      {/* Video source */}
-      {mode === "path" ? (
-        <div key="path-input">
-          <label className="mb-1 block text-xs font-bold text-on-surface-variant">
-            נתיב קובץ מקומי (Shift+לחצן ימני ← Copy as path) *
-          </label>
-          <input
-            type="text"
-            value={localPath}
-            onChange={(e) => setLocalPath(e.target.value)}
-            placeholder={'"G:\\My Drive\\clip.mp4"'}
-            dir="ltr"
-            required
-            className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
-          />
-        </div>
-      ) : (
-        <div key="file-input">
-          <label className="mb-1 block text-xs font-bold text-on-surface-variant">
-            קובץ וידאו *
-          </label>
+      {/* File picker */}
+      <div>
+        <label className="mb-1 block text-xs font-bold text-on-surface-variant">
+          קובץ וידאו *
+        </label>
+        {supportsFilePicker ? (
+          <button
+            type="button"
+            onClick={pickFile}
+            className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-right text-on-surface hover:bg-surface-container transition-colors"
+          >
+            {pickedFile ? (
+              <span className="flex items-center justify-between gap-2">
+                <span className="material-symbols-outlined text-sm text-primary">check_circle</span>
+                <span className="flex-1 truncate">{pickedFile.name}</span>
+              </span>
+            ) : (
+              <span className="flex items-center justify-between gap-2">
+                <span className="material-symbols-outlined text-sm text-on-surface-variant">upload_file</span>
+                <span className="text-on-surface-variant">בחר קובץ...</span>
+              </span>
+            )}
+          </button>
+        ) : (
           <input
             ref={fileRef}
             type="file"
             accept="video/mp4,video/quicktime"
             required
+            onChange={handleFallbackChange}
             className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface"
           />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Drive URL (optional) */}
       <div>
@@ -200,7 +219,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
       <div className="flex gap-2 pt-1">
         <button
           type="submit"
-          disabled={uploading}
+          disabled={uploading || !pickedFile}
           className="flex-1 rounded-full bg-primary py-2 text-sm font-bold text-on-primary disabled:opacity-60"
         >
           {uploading ? "מעבדת..." : "הוספת מסר"}
