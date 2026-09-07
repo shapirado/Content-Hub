@@ -22,9 +22,11 @@ function extractWav(inputPath: string, outputPath: string): Promise<void> {
 function extractThumbnail(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
-      .screenshots({ timestamps: [0], filename: path.basename(outputPath), folder: path.dirname(outputPath), size: "320x?" })
+      .outputOptions(["-ss", "1", "-vframes", "1", "-vf", "scale=320:-1"])
+      .output(outputPath)
       .on("end", () => resolve())
-      .on("error", (err: Error) => reject(err));
+      .on("error", (err: Error) => reject(err))
+      .run();
   });
 }
 

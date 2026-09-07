@@ -370,6 +370,7 @@ export function MediaLibraryApp({
           {/* Panel — slides in from the left (visually right in RTL) */}
           <div className="w-[420px] shrink-0 overflow-y-auto bg-surface shadow-2xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-outline-variant bg-surface px-5 py-4">
+              <h2 className="text-base font-bold text-on-surface">הוספת מסר יום</h2>
               <button
                 onClick={() => setShowAddMassarYom(false)}
                 className="text-on-surface-variant hover:text-on-surface"
@@ -377,7 +378,7 @@ export function MediaLibraryApp({
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
-              <h2 className="text-base font-bold text-on-surface">הוספת מסר יום</h2>
+              
             </div>
             <div className="p-5">
               <MassarYomAddForm

@@ -25,6 +25,10 @@ function isLocalPath(v: string) {
   return v.trim() && !v.trim().startsWith("http://") && !v.trim().startsWith("https://");
 }
 
+function isDriveUrl(v: string) {
+  return /drive\.google\.com/i.test(v.trim());
+}
+
 export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
   const [mode, setMode] = useState<"file" | "url">("url");
   const [scheduledDate, setScheduledDate] = useState("");
@@ -43,7 +47,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
 
     setError(null);
     const messages =
-      mode === "file" || isLocalPath(videoUrl)
+      mode === "file" || isLocalPath(videoUrl) || isDriveUrl(videoUrl)
         ? FILE_LOADING_MESSAGES
         : URL_LOADING_MESSAGES;
     let msgIdx = 0;

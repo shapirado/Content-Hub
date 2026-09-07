@@ -44,6 +44,7 @@ export const OPTIONS = {
   wardrobe: [
     { value: "בלי", label: "בלי", colorHex: null, image: null },
     { value: "סגול", label: "סגול", colorHex: "#5E4680", image: null },
+    { value: "סגול בהיר", label: "סגול בהיר", colorHex: "#c9ceff", image: null },
     { value: "תורכיז", label: "תורכיז", colorHex: "#23A6DA", image: null },
     { value: "כתום בהיר", label: "כתום בהיר", colorHex: "#FDBA74", image: null },
     { value: "כתום כהה", label: "כתום כהה", colorHex: "#FF884E", image: null },

@@ -456,7 +456,7 @@ export async function createMassarYomAction(
     videoPath = `uploads/${clipDetId}.mp4`;
     sourceType = "upload";
   } else {
-    const rawInput = (videoUrl as string).trim();
+    const rawInput = (videoUrl as string).trim().replace(/^"(.*)"$/, "$1");
     const isLocalPath = !rawInput.startsWith("http://") && !rawInput.startsWith("https://");
     if (isLocalPath) {
       const fs = (await import("fs")).default;
@@ -470,7 +470,6 @@ export async function createMassarYomAction(
     } else {
       videoPath = rawInput;
       sourceType = "url";
-      // No video to transcribe — use Nirit's caption as the transcript proxy
       transcript = niritCaption.trim();
     }
   }
@@ -478,15 +477,13 @@ export async function createMassarYomAction(
   const { hook, tiktokHashtags, youtubeTitle, pillar, summary, tag } =
     await generateMassarYomContent(transcript, niritCaption.trim());
 
-  const rawVideoInput = hasFile ? null : (videoUrl as string).trim();
+  const rawVideoInput = hasFile ? null : (videoUrl as string).trim().replace(/^"(.*)"$/, "$1");
   const isLocalPath = rawVideoInput
     ? !rawVideoInput.startsWith("http://") && !rawVideoInput.startsWith("https://")
     : false;
   const originalFilename = hasFile
     ? ((videoFile as File).name || null)
-    : isLocalPath && rawVideoInput
-    ? path.basename(rawVideoInput) || null
-    : null;
+    : (isLocalPath && rawVideoInput ? path.basename(rawVideoInput) || null : null);
   const isGoogleDriveUrl = !hasFile && !isLocalPath && /drive\.google\.com/i.test(rawVideoInput ?? "");
 
   await createMassarYom({

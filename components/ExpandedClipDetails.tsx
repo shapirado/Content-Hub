@@ -15,6 +15,7 @@ import {
   updateClipTranscriptAction,
   updateClipThumbnailAction,
   regenerateHookAction,
+  uploadToYouTubeAction,
 } from "@/app/actions";
 import { OPTIONS } from "@/lib/options";
 import { PLATFORM_DISPLAY } from "@/lib/platforms";
@@ -88,6 +89,8 @@ export function ExpandedClipDetails({
   const [currentThumbnail, setCurrentThumbnail] = useState<string | null>(
     item.clip.thumbnail ?? fullClip?.thumbnail ?? null
   );
+  const [uploadingYouTube, startUploadingYouTube] = useTransition();
+  const [youtubeError, setYoutubeError] = useState<string | null>(null);
 
   const library = item.library;
   const thumbnail = item.clip.thumbnail ?? fullClip?.thumbnail ?? null;
@@ -134,6 +137,20 @@ export function ExpandedClipDetails({
         setHooks([result.hook]);
       } catch (err) {
         setHookError(err instanceof Error ? err.message : "שגיאה לא ידועה");
+      }
+    });
+  }
+
+  function uploadToYouTube() {
+    setYoutubeError(null);
+    startUploadingYouTube(async () => {
+      try {
+        await uploadToYouTubeAction(item.clip.id);
+        const fresh = await listClipCopiesAction(item.clip.id);
+        setCopies(fresh);
+        notifyPlatforms(fresh, performance);
+      } catch (err) {
+        setYoutubeError(err instanceof Error ? err.message : "שגיאה לא ידועה");
       }
     });
   }
@@ -385,6 +402,28 @@ export function ExpandedClipDetails({
                   </div>
                 </div>
               )}
+
+              {(() => {
+                const hasLocalUpload = copies.some((c) => c.path.startsWith("uploads/"));
+                const hasYouTubeCopy = copies.some(
+                  (c) => isUrlPath(c.path) && (c.path.includes("youtu.be") || c.path.includes("youtube.com"))
+                );
+                return hasLocalUpload && !hasYouTubeCopy ? (
+                  <div className="pt-1">
+                    {youtubeError && (
+                      <p className="mb-2 text-[11px] text-error">{youtubeError}</p>
+                    )}
+                    <button
+                      onClick={uploadToYouTube}
+                      disabled={uploadingYouTube}
+                      className="flex items-center gap-2 rounded-full bg-red-600 px-4 py-1.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-60"
+                    >
+                      <span className="material-symbols-outlined text-sm">smart_display</span>
+                      {uploadingYouTube ? "מעלה ל-YouTube..." : "העלאה ל-YouTube"}
+                    </button>
+                  </div>
+                ) : null;
+              })()}
 
               <button
                 onClick={() => setShowTranscript((v) => !v)}
