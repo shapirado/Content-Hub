@@ -942,21 +942,29 @@ export async function createMassarYom(data: {
 }): Promise<void> {
   const client = sql();
   const googleDriveUploaded = data.googleDriveUploaded ?? false;
+  // Prefer the filename (without extension) as the display title; fall back to Claude-generated title
+  const displayTitle = data.originalFilename
+    ? data.originalFilename.replace(/\.[^.]+$/, "")
+    : data.youtubeTitle;
+  const clipsPlatform =
+    data.sourceType === "url" && /drive\.google\.com/i.test(data.videoPath)
+      ? "google_drive"
+      : null;
 
   await client`
     INSERT INTO clip_details
       (id, title, transcript, summary, hooks, context_tags, usable, posted_to_tiktok,
        source_type, pillar, tag, thumbnail, org_whatsapp_text, original_filename, google_drive_uploaded)
     VALUES
-      (${data.clipDetId}::uuid, ${data.youtubeTitle}, ${data.transcript}, ${data.summary},
+      (${data.clipDetId}::uuid, ${displayTitle}, ${data.transcript}, ${data.summary},
        ${JSON.stringify([data.hook])}::jsonb, ARRAY[]::text[], 'usable', false,
        ${data.sourceType}, ${data.pillar}, ${data.tag}, ${data.thumbnail},
        ${data.niritCaption}, ${data.originalFilename}, ${googleDriveUploaded})
   `;
 
   await client`
-    INSERT INTO clips (clip_det_id, source_type, path, title)
-    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${data.youtubeTitle})
+    INSERT INTO clips (clip_det_id, source_type, path, title, platform)
+    VALUES (${data.clipDetId}::uuid, ${data.sourceType}, ${data.videoPath}, ${displayTitle}, ${clipsPlatform})
   `;
 
   await client`

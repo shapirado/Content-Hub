@@ -508,7 +508,7 @@ export async function createMassarYomAction(
 
   // When both a local file and a Drive URL were given, also store the Drive URL as a copy
   if (localFilePath && driveUrl && isGoogleDriveUrl) {
-    await addClipCopy(clipDetId, "url", driveUrl);
+    await addClipCopy(clipDetId, "url", driveUrl, "google_drive");
   }
 
   return { clipDetId };

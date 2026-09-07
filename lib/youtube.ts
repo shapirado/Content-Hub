@@ -127,7 +127,7 @@ export async function uploadToYouTube(params: {
       tags,
     },
     status: {
-      privacyStatus: "unlisted",
+      privacyStatus: "public",
       selfDeclaredMadeForKids: false,
     },
   };
