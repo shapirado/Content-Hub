@@ -39,25 +39,28 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
   // Persist last-used directory handle in sessionStorage (IndexedDB would survive across tabs
   // but FileSystemDirectoryHandle can't be JSON-serialised — we keep the handle in memory
   // across re-renders via a ref and restore from the browser's own picker memory otherwise)
-  const lastDirHandleRef = useRef<FileSystemDirectoryHandle | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastDirHandleRef = useRef<any>(null);
 
   async function pickFile() {
     try {
-      const opts: OpenFilePickerOptions = {
+      const opts: Record<string, unknown> = {
         types: [{ description: "Video", accept: { "video/*": [".mp4", ".mov", ".m4v"] } }],
         multiple: false,
       };
       if (lastDirHandleRef.current) {
-        (opts as Record<string, unknown>).startIn = lastDirHandleRef.current;
+        opts.startIn = lastDirHandleRef.current;
       }
-      const [handle] = await window.showOpenFilePicker(opts);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [handle] = await (window as any).showOpenFilePicker(opts);
       // Remember the parent directory for next time
       try {
-        // @ts-expect-error — non-standard but works in Chrome
-        const dir = await handle.getParent?.();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const dir = await (handle as any).getParent?.();
         if (dir) lastDirHandleRef.current = dir;
       } catch { /* ignore */ }
-      const file = await handle.getFile();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const file = await (handle as any).getFile();
       setPickedFile(file);
     } catch (err) {
       // User cancelled — not an error
