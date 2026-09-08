@@ -89,7 +89,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
     startUpload(async () => {
       try {
         const formData = new FormData();
-        formData.set("videoFile", pickedFile);
+        if (pickedFile) formData.set("videoFile", pickedFile);
         if (videoUrl.trim()) formData.set("videoUrl", videoUrl.trim());
         formData.set("scheduledDate", scheduledDate);
         formData.set("niritCaption", caption.trim());
