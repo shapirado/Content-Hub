@@ -6,7 +6,6 @@ import he_IL from "antd/locale/he_IL";
 import dayjs, { type Dayjs } from "dayjs";
 import "dayjs/locale/he";
 import updateLocale from "dayjs/plugin/updateLocale";
-import { createMassarYomAction } from "@/app/actions";
 
 dayjs.extend(updateLocale);
 dayjs.locale("he");
@@ -95,7 +94,11 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
         formData.set("scheduledDate", scheduledDate);
         formData.set("niritCaption", caption.trim());
 
-        const result = await createMassarYomAction(formData);
+        const res = await fetch("/api/daily/analyze", { method: "POST", body: formData });
+        const result = await res.json() as { clipDetId?: string; youtubeError?: string | null; error?: string };
+        if (!res.ok) {
+          throw new Error(result.error ?? "שגיאה לא ידועה");
+        }
         if (result.youtubeError) {
           setYoutubeWarning(`הקליפ נשמר — העלאה ל-YouTube נכשלה: ${result.youtubeError}`);
         }
