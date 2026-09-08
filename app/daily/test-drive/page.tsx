@@ -2,8 +2,17 @@
 
 import { useState } from "react";
 
+type DbPreview = {
+  clips_path: string;
+  clips_platform: string;
+  clips_source_type: string;
+  clips_title: string;
+  clip_details_original_filename: string;
+  clip_details_video_path: string;
+};
+
 type Result =
-  | { ok: true; fileId: string; filename: string; contentType: string; reportedSize: string; firstBytesRead: number }
+  | { ok: true; fileId: string; filename: string; contentType: string; reportedSize: string; firstBytesRead: number; db: DbPreview }
   | { ok?: false; error: string; fileId?: string };
 
 export default function TestDrivePage() {
@@ -59,14 +68,36 @@ export default function TestDrivePage() {
       {result && (
         <div className={`mt-6 rounded-xl p-4 text-sm ${result.ok ? "bg-green-50 text-green-900" : "bg-red-50 text-red-900"}`}>
           {result.ok ? (
-            <dl className="space-y-1">
-              <div><dt className="inline font-bold">סטטוס: </dt><dd className="inline">✅ הצלחה</dd></div>
-              <div><dt className="inline font-bold">מזהה קובץ: </dt><dd className="inline font-mono text-xs">{result.fileId}</dd></div>
-              <div><dt className="inline font-bold">שם קובץ: </dt><dd className="inline">{result.filename}</dd></div>
-              <div><dt className="inline font-bold">סוג: </dt><dd className="inline">{result.contentType}</dd></div>
-              <div><dt className="inline font-bold">גודל (Content-Length): </dt><dd className="inline">{result.reportedSize}</dd></div>
-              <div><dt className="inline font-bold">בייטים שהתקבלו: </dt><dd className="inline">{result.firstBytesRead.toLocaleString()}</dd></div>
-            </dl>
+            <div className="space-y-4">
+              <dl className="space-y-1">
+                <div><dt className="inline font-bold">סטטוס: </dt><dd className="inline">✅ הצלחה</dd></div>
+                <div><dt className="inline font-bold">מזהה קובץ: </dt><dd className="inline font-mono text-xs">{result.fileId}</dd></div>
+                <div><dt className="inline font-bold">שם קובץ: </dt><dd className="inline">{result.filename}</dd></div>
+                <div><dt className="inline font-bold">סוג: </dt><dd className="inline">{result.contentType}</dd></div>
+                <div><dt className="inline font-bold">גודל (Content-Length): </dt><dd className="inline">{result.reportedSize}</dd></div>
+                <div><dt className="inline font-bold">בייטים שהתקבלו: </dt><dd className="inline">{result.firstBytesRead.toLocaleString()}</dd></div>
+              </dl>
+
+              <div className="border-t border-green-200 pt-3">
+                <p className="mb-2 font-bold text-green-800">ערכים שישמרו ל-DB:</p>
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-green-100">
+                      <th className="border border-green-200 px-2 py-1 text-right font-semibold">טבלה.עמודה</th>
+                      <th className="border border-green-200 px-2 py-1 text-right font-semibold">ערך</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(result.db).map(([key, val]) => (
+                      <tr key={key}>
+                        <td className="border border-green-200 px-2 py-1 font-mono">{key.replace("_", ".")}</td>
+                        <td className="border border-green-200 px-2 py-1 break-all">{val}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
             <p><span className="font-bold">שגיאה:</span> {result.error}</p>
           )}

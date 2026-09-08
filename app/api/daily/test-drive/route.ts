@@ -52,6 +52,8 @@ export async function POST(req: Request) {
 
     const reportedSize = contentLength ? `${(parseInt(contentLength) / 1024 / 1024).toFixed(1)} MB` : "לא ידוע";
 
+    const displayTitle = filename.replace(/\.[^.]+$/, "");
+
     return NextResponse.json({
       ok: true,
       fileId,
@@ -59,6 +61,15 @@ export async function POST(req: Request) {
       contentType,
       reportedSize,
       firstBytesRead: bytesRead,
+      // Values that will be written to the DB
+      db: {
+        clips_path: driveUrl.trim(),       // clips.path
+        clips_platform: "googledrive",      // clips.platform
+        clips_source_type: "url",           // clips.source_type
+        clips_title: displayTitle,          // clips.title
+        clip_details_original_filename: filename,  // clip_details.original_filename
+        clip_details_video_path: "(os.tmpdir after download)", // clip_details.video_path — temp
+      },
     });
   } catch (err) {
     return NextResponse.json(
