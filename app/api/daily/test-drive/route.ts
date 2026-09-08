@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 
+// HTTP/1.1 headers arrive as Latin-1; if the server sent UTF-8 bytes in a plain
+// filename= field, each byte was mapped to the equivalent Latin-1 code point.
+// Re-encoding those code points as bytes and decoding as UTF-8 recovers the original text.
+function fixHeaderEncoding(str: string): string {
+  try {
+    const bytes = Uint8Array.from(str, c => c.charCodeAt(0));
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return str; // not mangled UTF-8 — return as-is
+  }
+}
+
 function extractDriveFileId(url: string): string | null {
   const m = url.match(/\/file\/d\/([^/?&]+)/);
   if (m) return m[1];
@@ -48,14 +60,15 @@ export async function POST(req: Request) {
     const contentType = res.headers.get("content-type") ?? "unknown";
     const contentLength = res.headers.get("content-length");
 
-    // Prefer RFC 5987 (filename*=UTF-8''...) over plain filename= (often Windows-1252 encoded)
+    // Prefer RFC 5987 (filename*=UTF-8''...) — percent-decoded, already correct UTF-8.
+    // Fall back to plain filename= and fix the Latin-1→UTF-8 mangling from Node's HTTP layer.
     let filename: string;
     const rfc5987 = disposition.match(/filename\*=UTF-8''([^;\n\r]+)/i);
     if (rfc5987) {
       filename = decodeURIComponent(rfc5987[1].trim());
     } else {
       const plain = disposition.match(/filename="?([^";\n\r]+)"?/i);
-      filename = plain ? plain[1].trim() : `clip-${fileId}.mp4`;
+      filename = plain ? fixHeaderEncoding(plain[1].trim()) : `clip-${fileId}.mp4`;
     }
 
     const reportedSize = contentLength
