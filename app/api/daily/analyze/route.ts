@@ -1,6 +1,47 @@
 import { NextResponse } from "next/server";
-import path from "path";
 import { auth } from "@/auth";
+
+export const maxDuration = 60; // Vercel Hobby max; needed for large Drive downloads
+
+function fixHeaderEncoding(str: string): string {
+  try {
+    const bytes = Uint8Array.from(str, c => c.charCodeAt(0));
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return str;
+  }
+}
+
+function extractDriveFileId(url: string): string | null {
+  const m = url.match(/\/file\/d\/([^/?&]+)/);
+  if (m) return m[1];
+  const m2 = url.match(/[?&]id=([^&]+)/);
+  return m2 ? m2[1] : null;
+}
+
+async function downloadFromDrive(fileId: string): Promise<{ buffer: Buffer; filename: string }> {
+  const downloadUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0&confirm=t`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 55000);
+  let res: Response;
+  try {
+    res = await fetch(downloadUrl, { redirect: "follow", signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!res.ok) throw new Error(`הורדה מ-Google Drive נכשלה (${res.status})`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  const disposition = res.headers.get("content-disposition") ?? "";
+  const rfc5987 = disposition.match(/filename\*=UTF-8''([^;\n\r]+)/i);
+  let filename: string;
+  if (rfc5987) {
+    filename = decodeURIComponent(rfc5987[1].trim());
+  } else {
+    const plain = disposition.match(/filename="?([^";\n\r]+)"?/i);
+    filename = plain ? fixHeaderEncoding(plain[1].trim()) : `clip-${fileId}.mp4`;
+  }
+  return { buffer, filename };
+}
 import {
   createMassarYom,
   addGoogleDriveClipsCopy,
@@ -34,12 +75,21 @@ export async function POST(req: Request) {
     if (typeof niritCaption !== "string" || !niritCaption.trim()) {
       return NextResponse.json({ error: "טקסט הפוסט חסר" }, { status: 400 });
     }
-    if (!(videoFile instanceof File) || videoFile.size === 0) {
-      return NextResponse.json({ error: "יש לספק קובץ וידאו" }, { status: 400 });
-    }
+    const driveFileId = driveUrl ? extractDriveFileId(driveUrl) : null;
 
-    const buffer = Buffer.from(await videoFile.arrayBuffer());
-    const originalFilename = videoFile.name;
+    let buffer: Buffer;
+    let originalFilename: string;
+
+    if (driveFileId) {
+      const downloaded = await downloadFromDrive(driveFileId);
+      buffer = downloaded.buffer;
+      originalFilename = downloaded.filename;
+    } else if (videoFile instanceof File && videoFile.size > 0) {
+      buffer = Buffer.from(await videoFile.arrayBuffer());
+      originalFilename = videoFile.name;
+    } else {
+      return NextResponse.json({ error: "יש לספק קישור Google Drive או קובץ וידאו" }, { status: 400 });
+    }
     const clipDetId = crypto.randomUUID();
     const displayTitle = originalFilename.replace(/\.[^.]+$/, "");
 

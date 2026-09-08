@@ -75,7 +75,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!scheduledDate || !caption.trim()) return;
-    if (!pickedFile) return;
+    if (!videoUrl.trim() && !pickedFile) return;
 
     setError(null);
     setYoutubeWarning(null);
@@ -114,10 +114,25 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 text-right">
-      {/* File picker */}
+      {/* Drive URL — primary video source */}
       <div>
         <label className="mb-1 block text-xs font-bold text-on-surface-variant">
-          קובץ וידאו *
+          קישור Google Drive *
+        </label>
+        <input
+          type="text"
+          value={videoUrl}
+          onChange={(e) => setVideoUrl(e.target.value)}
+          placeholder="https://drive.google.com/file/d/..."
+          dir="ltr"
+          className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
+        />
+      </div>
+
+      {/* File picker — fallback when no Drive URL */}
+      <div>
+        <label className="mb-1 block text-xs font-bold text-on-surface-variant">
+          קובץ וידאו (אם אין קישור Drive)
         </label>
         {supportsFilePicker ? (
           <button
@@ -142,26 +157,10 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
             ref={fileRef}
             type="file"
             accept="video/mp4,video/quicktime"
-            required
             onChange={handleFallbackChange}
             className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface"
           />
         )}
-      </div>
-
-      {/* Drive URL (optional) */}
-      <div>
-        <label className="mb-1 block text-xs font-bold text-on-surface-variant">
-          קישור Google Drive (Copy link to clipboard) — אופציונלי
-        </label>
-        <input
-          type="text"
-          value={videoUrl}
-          onChange={(e) => setVideoUrl(e.target.value)}
-          placeholder="https://drive.google.com/open?id=..."
-          dir="ltr"
-          className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:border-primary"
-        />
       </div>
 
       {/* Date */}
@@ -225,7 +224,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
       <div className="flex gap-2 pt-1">
         <button
           type="submit"
-          disabled={uploading || !pickedFile}
+          disabled={uploading || (!videoUrl.trim() && !pickedFile)}
           className="flex-1 rounded-full bg-primary py-2 text-sm font-bold text-on-primary disabled:opacity-60"
         >
           {uploading ? "מעבדת..." : "הוספת מסר"}
