@@ -48,10 +48,15 @@ export async function POST(req: Request) {
     const contentType = res.headers.get("content-type") ?? "unknown";
     const contentLength = res.headers.get("content-length");
 
-    const nameMatch = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";\n]+)/i);
-    const filename = nameMatch
-      ? decodeURIComponent(nameMatch[1].trim().replace(/"/g, ""))
-      : `clip-${fileId}.mp4`;
+    // Prefer RFC 5987 (filename*=UTF-8''...) over plain filename= (often Windows-1252 encoded)
+    let filename: string;
+    const rfc5987 = disposition.match(/filename\*=UTF-8''([^;\n\r]+)/i);
+    if (rfc5987) {
+      filename = decodeURIComponent(rfc5987[1].trim());
+    } else {
+      const plain = disposition.match(/filename="?([^";\n\r]+)"?/i);
+      filename = plain ? plain[1].trim() : `clip-${fileId}.mp4`;
+    }
 
     const reportedSize = contentLength
       ? `${(parseInt(contentLength) / 1024 / 1024).toFixed(1)} MB`
@@ -67,6 +72,7 @@ export async function POST(req: Request) {
       contentType,
       reportedSize,
       isVideo,
+      rawDisposition: disposition,
       // Values that will be written to the DB
       db: {
         "clips.path": driveUrl,

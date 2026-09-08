@@ -5,7 +5,7 @@ import { useState } from "react";
 type DbPreview = Record<string, string>;
 
 type Result =
-  | { ok: true; fileId: string; filename: string; contentType: string; reportedSize: string; isVideo: boolean; db: DbPreview }
+  | { ok: true; fileId: string; filename: string; contentType: string; reportedSize: string; isVideo: boolean; rawDisposition: string; db: DbPreview }
   | { ok?: false; error: string; fileId?: string };
 
 export default function TestDrivePage() {
@@ -69,6 +69,7 @@ export default function TestDrivePage() {
                 <div><dt className="inline font-bold">סוג: </dt><dd className="inline">{result.contentType}</dd></div>
                 <div><dt className="inline font-bold">גודל (Content-Length): </dt><dd className="inline">{result.reportedSize}</dd></div>
                 <div><dt className="inline font-bold">קובץ וידאו: </dt><dd className="inline">{result.isVideo ? "✅ כן" : "⚠️ לא (בדוק content-type)"}</dd></div>
+                <div className="pt-1"><dt className="font-bold">Content-Disposition גולמי:</dt><dd className="mt-1 break-all font-mono text-xs text-gray-600">{result.rawDisposition}</dd></div>
               </dl>
 
               <div className="border-t border-green-200 pt-3">
