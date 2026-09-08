@@ -2,17 +2,10 @@
 
 import { useState } from "react";
 
-type DbPreview = {
-  clips_path: string;
-  clips_platform: string;
-  clips_source_type: string;
-  clips_title: string;
-  clip_details_original_filename: string;
-  clip_details_video_path: string;
-};
+type DbPreview = Record<string, string>;
 
 type Result =
-  | { ok: true; fileId: string; filename: string; contentType: string; reportedSize: string; firstBytesRead: number; db: DbPreview }
+  | { ok: true; fileId: string; filename: string; contentType: string; reportedSize: string; isVideo: boolean; db: DbPreview }
   | { ok?: false; error: string; fileId?: string };
 
 export default function TestDrivePage() {
@@ -61,7 +54,7 @@ export default function TestDrivePage() {
           disabled={loading || !url.trim()}
           className="w-full rounded-full bg-blue-600 py-2 text-sm font-bold text-white disabled:opacity-60"
         >
-          {loading ? "מוריד..." : "בדיקה"}
+          {loading ? "מורידה..." : "בדיקה"}
         </button>
       </form>
 
@@ -75,7 +68,7 @@ export default function TestDrivePage() {
                 <div><dt className="inline font-bold">שם קובץ: </dt><dd className="inline">{result.filename}</dd></div>
                 <div><dt className="inline font-bold">סוג: </dt><dd className="inline">{result.contentType}</dd></div>
                 <div><dt className="inline font-bold">גודל (Content-Length): </dt><dd className="inline">{result.reportedSize}</dd></div>
-                <div><dt className="inline font-bold">בייטים שהתקבלו: </dt><dd className="inline">{result.firstBytesRead.toLocaleString()}</dd></div>
+                <div><dt className="inline font-bold">קובץ וידאו: </dt><dd className="inline">{result.isVideo ? "✅ כן" : "⚠️ לא (בדוק content-type)"}</dd></div>
               </dl>
 
               <div className="border-t border-green-200 pt-3">
@@ -90,7 +83,7 @@ export default function TestDrivePage() {
                   <tbody>
                     {Object.entries(result.db).map(([key, val]) => (
                       <tr key={key}>
-                        <td className="border border-green-200 px-2 py-1 font-mono">{key.replace("_", ".")}</td>
+                        <td className="border border-green-200 px-2 py-1 font-mono">{key}</td>
                         <td className="border border-green-200 px-2 py-1 break-all">{val}</td>
                       </tr>
                     ))}

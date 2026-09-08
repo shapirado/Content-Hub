@@ -9,50 +9,56 @@ function extractDriveFileId(url: string): string | null {
 
 export async function POST(req: Request) {
   try {
-    const { driveUrl } = (await req.json()) as { driveUrl?: string };
-    if (!driveUrl?.trim()) {
+    const body = await req.json() as { driveUrl?: string };
+    const driveUrl = body.driveUrl?.trim() ?? "";
+
+    if (!driveUrl) {
       return NextResponse.json({ error: "חסר קישור" }, { status: 400 });
     }
 
-    const fileId = extractDriveFileId(driveUrl.trim());
+    const fileId = extractDriveFileId(driveUrl);
     if (!fileId) {
       return NextResponse.json({ error: "לא נמצא מזהה קובץ בקישור" }, { status: 400 });
     }
 
     const downloadUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0&confirm=t`;
-    const res = await fetch(downloadUrl, { redirect: "follow" });
+
+    // Abort if Google Drive doesn't respond within 8 s (Vercel Hobby limit is 10 s)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    let res: Response;
+    try {
+      res = await fetch(downloadUrl, { redirect: "follow", signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!res.ok) {
       return NextResponse.json(
-        { error: `Google Drive החזיר ${res.status}`, fileId },
+        { error: `Google Drive החזיר ${res.status} ${res.statusText}`, fileId },
         { status: 502 }
       );
     }
 
+    // Cancel body immediately — we only need headers for the test
+    await res.body?.cancel();
+
     const disposition = res.headers.get("content-disposition") ?? "";
+    const contentType = res.headers.get("content-type") ?? "unknown";
+    const contentLength = res.headers.get("content-length");
+
     const nameMatch = disposition.match(/filename\*?=(?:UTF-8''|"?)([^";\n]+)/i);
     const filename = nameMatch
       ? decodeURIComponent(nameMatch[1].trim().replace(/"/g, ""))
       : `clip-${fileId}.mp4`;
 
-    const contentType = res.headers.get("content-type") ?? "unknown";
-    const contentLength = res.headers.get("content-length");
-
-    // Read just the first 64KB to confirm the stream opens; don't buffer the whole file
-    const reader = res.body?.getReader();
-    let bytesRead = 0;
-    if (reader) {
-      while (bytesRead < 65536) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytesRead += value.length;
-      }
-      await reader.cancel();
-    }
-
-    const reportedSize = contentLength ? `${(parseInt(contentLength) / 1024 / 1024).toFixed(1)} MB` : "לא ידוע";
+    const reportedSize = contentLength
+      ? `${(parseInt(contentLength) / 1024 / 1024).toFixed(1)} MB`
+      : "לא ידוע (אין Content-Length)";
 
     const displayTitle = filename.replace(/\.[^.]+$/, "");
+    const isVideo = contentType.startsWith("video/") || filename.match(/\.(mp4|mov|m4v|webm)$/i);
 
     return NextResponse.json({
       ok: true,
@@ -60,20 +66,22 @@ export async function POST(req: Request) {
       filename,
       contentType,
       reportedSize,
-      firstBytesRead: bytesRead,
+      isVideo,
       // Values that will be written to the DB
       db: {
-        clips_path: driveUrl.trim(),       // clips.path
-        clips_platform: "googledrive",      // clips.platform
-        clips_source_type: "url",           // clips.source_type
-        clips_title: displayTitle,          // clips.title
-        clip_details_original_filename: filename,  // clip_details.original_filename
-        clip_details_video_path: "(os.tmpdir after download)", // clip_details.video_path — temp
+        "clips.path": driveUrl,
+        "clips.platform": "googledrive",
+        "clips.source_type": "url",
+        "clips.title": displayTitle,
+        "clip_details.original_filename": filename,
+        "clip_details.video_path": "(os.tmpdir()/<uuid>.mp4 after download)",
       },
     });
   } catch (err) {
+    const msg = (err as Error)?.message ?? "שגיאה לא ידועה";
+    const isTimeout = msg.includes("abort") || msg.includes("Abort");
     return NextResponse.json(
-      { error: (err as Error)?.message ?? "שגיאה לא ידועה" },
+      { error: isTimeout ? "הורדה לא הסתיימה תוך 8 שניות (timeout)" : msg },
       { status: 500 }
     );
   }
