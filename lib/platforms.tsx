@@ -7,7 +7,7 @@ import { GoogleDriveIcon, InstagramIcon, TikTokIcon, WhatsAppIcon, YouTubeIcon }
  */
 export const PLATFORM_DISPLAY = [
   { key: "YouTube", label: "YouTube", Icon: YouTubeIcon, color: "#FF0000", match: (p: string[]) => p.includes("YouTube") },
-  { key: "Instagram", label: "Instagram", Icon: InstagramIcon, color: "#E4405F", match: (p: string[]) => p.includes("Instagram") },
+  { key: "Instagram", label: "Instagram", Icon: InstagramIcon, color: "#8B5CF6", match: (p: string[]) => p.includes("Instagram") },
   { key: "TikTok", label: "TikTok", Icon: TikTokIcon, color: "#000000", match: (p: string[]) => p.includes("TikTok") },
   {
     key: "WhatsApp",

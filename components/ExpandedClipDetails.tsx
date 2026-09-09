@@ -167,7 +167,11 @@ export function ExpandedClipDetails({
 
   function notifyPlatforms(nextCopies: ClipCopy[], nextPerformance: ClipPerformance[]) {
     const platforms = new Set<string>();
-    nextCopies.forEach((c) => c.platform && platforms.add(c.platform));
+    nextCopies.forEach((c) => {
+      if (!c.platform) return;
+      // Normalise youtube variants so filter bar sees a single "youtube" key
+      platforms.add(c.platform.toLowerCase().startsWith("youtube") ? "youtube" : c.platform);
+    });
     nextPerformance.forEach((p) => p.platform && platforms.add(p.platform));
     if (nextCopies.some((c) => c.source_type === "upload")) platforms.add("googledrive");
     onCopyPlatformsChange([...platforms]);
@@ -179,13 +183,17 @@ export function ExpandedClipDetails({
 
   /** A clip whose own copy lives on a platform (e.g. it originated on Instagram, like the YouTube case, or a bare Drive path) counts as posted-with-a-link there too, not just an explicit clip_performance posting. Google Drive is special-cased: any 'upload' copy counts, whether or not its `platform` column is explicitly tagged "googledrive". */
   function platformStatus(key: string) {
+    const keyLower = key.toLowerCase();
     const copy =
-      key.toLowerCase() === "googledrive"
-        ? copies.find((c) => c.source_type === "upload" || (c.platform ?? "").toLowerCase() === key.toLowerCase())
-        : copies.find((c) => (c.platform ?? "").toLowerCase() === key.toLowerCase());
+      keyLower === "googledrive"
+        ? copies.find((c) => c.source_type === "upload" || (c.platform ?? "").toLowerCase() === keyLower)
+        : keyLower === "youtube"
+        ? copies.find((c) => (c.platform ?? "").toLowerCase().startsWith("youtube"))
+        : copies.find((c) => (c.platform ?? "").toLowerCase() === keyLower);
     const perf = performanceFor(key);
     const link = copy ? resolveCopyLink(copy.path) : (perf?.live_post_url ?? null);
-    return { posted: !!copy || !!perf, link, perf, hasCopy: !!copy };
+    const isUnlisted = keyLower === "youtube" && !!copy && (copy.platform ?? "").toLowerCase() === "youtube";
+    return { posted: !!copy || !!perf, link, perf, hasCopy: !!copy, isUnlisted };
   }
 
   function markPosted(key: string) {
@@ -545,6 +553,33 @@ export function ExpandedClipDetails({
                     <div className="flex shrink-0 items-center gap-2">
                       <div className="flex items-center gap-1">
                         {PLATFORM_DISPLAY.map(({ key, label, Icon, color }) => {
+                          if (key === "YouTube") {
+                            const ytPlatform = (c.platform ?? "").toLowerCase();
+                            const ytState: "off" | "unlisted" | "public" =
+                              ytPlatform === "youtube" ? "unlisted"
+                              : ytPlatform === "youtube-public" ? "public"
+                              : "off";
+                            const nextPlatform = ytState === "off" ? "youtube" : ytState === "unlisted" ? "youtube-public" : "";
+                            const ytTitle = ytState === "unlisted" ? "YouTube — לא רשום (לחץ להפוך לפומבי)" : ytState === "public" ? "YouTube — פומבי (לחץ לכיבוי)" : "YouTube — כבוי (לחץ להוסיף כלא רשום)";
+                            return (
+                              <button
+                                key={key}
+                                title={ytTitle}
+                                disabled={saving}
+                                onClick={() => setCopyPlatform(c.id, nextPlatform)}
+                                style={ytState !== "off" ? {
+                                  borderColor: color,
+                                  backgroundColor: `${color}1A`,
+                                  borderStyle: ytState === "unlisted" ? "dashed" : "solid",
+                                } : undefined}
+                                className={`flex h-6 w-6 items-center justify-center rounded-full border transition-colors disabled:opacity-60 ${
+                                  ytState !== "off" ? "" : "border-outline-variant text-on-surface-variant/50 hover:border-primary/40"
+                                }`}
+                              >
+                                <Icon className="h-3.5 w-3.5" style={ytState !== "off" ? { color } : undefined} />
+                              </button>
+                            );
+                          }
                           const active = (c.platform ?? "").toLowerCase() === key.toLowerCase();
                           return (
                             <button
@@ -623,9 +658,8 @@ export function ExpandedClipDetails({
         <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           {PLATFORM_DISPLAY.map(({ key, label, Icon, color }) => {
-            const { posted, link, hasCopy } = platformStatus(key);
+            const { posted, link, isUnlisted } = platformStatus(key);
             const hasLink = !!link;
-            const isUnlisted = key.toLowerCase() === "youtube" && hasCopy;
             return (
               <button
                 key={key}
