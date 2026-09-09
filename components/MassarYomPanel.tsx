@@ -202,7 +202,7 @@ function ClipCard({
         <div className="space-y-1">
           <CheckStep
             done={!!youtubeTask?.live_url}
-            label={youtubeTask?.live_url ? "פורסם ל-YouTube" : "פרסום ל-YouTube"}
+            label={youtubeTask?.live_url ? "הועלה ל-YouTube (לא רשום)" : "העלאה ל-YouTube"}
           />
           {youtubeTask && !youtubeTask.live_url && (
             <div className="mr-7">
