@@ -185,7 +185,7 @@ export function ExpandedClipDetails({
         : copies.find((c) => (c.platform ?? "").toLowerCase() === key.toLowerCase());
     const perf = performanceFor(key);
     const link = copy ? resolveCopyLink(copy.path) : (perf?.live_post_url ?? null);
-    return { posted: !!copy || !!perf, link, perf };
+    return { posted: !!copy || !!perf, link, perf, hasCopy: !!copy };
   }
 
   function markPosted(key: string) {
@@ -623,66 +623,35 @@ export function ExpandedClipDetails({
         <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           {PLATFORM_DISPLAY.map(({ key, label, Icon, color }) => {
-            const { posted, link, perf } = platformStatus(key);
+            const { posted, link, hasCopy } = platformStatus(key);
             const hasLink = !!link;
+            const isUnlisted = key.toLowerCase() === "youtube" && hasCopy;
             return (
-              <div key={key} className="flex flex-col gap-1.5">
-                <button
-                  onClick={() => {
-                    if (!posted) {
-                      markPosted(key);
-                      return;
-                    }
-                    if (hasLink) {
-                      window.open(link!, "_blank", "noopener,noreferrer");
-                      return;
-                    }
-                    setAddingLinkFor(addingLinkFor === key ? null : key);
-                    setLinkInput("");
-                  }}
-                  disabled={saving}
-                  style={posted ? { color, borderColor: color, backgroundColor: `${color}1A` } : undefined}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-60 ${
-                    posted
-                      ? "hover:opacity-80"
-                      : "border-outline-variant text-on-surface-variant hover:border-primary/40"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" style={posted ? { color } : undefined} />
-                  {label}
-                  {posted && (
-                    <span className="material-symbols-outlined text-xs">
-                      {hasLink ? "open_in_new" : "link_off"}
-                    </span>
-                  )}
-                </button>
-
-                {addingLinkFor === key && perf && (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      value={linkInput}
-                      onChange={(e) => setLinkInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          saveLink(perf);
-                        }
-                      }}
-                      placeholder="קישור לפוסט..."
-                      autoFocus
-                      disabled={saving}
-                      className="min-w-0 flex-1 rounded border border-outline-variant bg-surface-container-lowest px-2 py-1 text-[11px] text-on-surface disabled:opacity-60"
-                    />
-                    <button
-                      onClick={() => saveLink(perf)}
-                      disabled={saving || !linkInput.trim()}
-                      className="shrink-0 rounded bg-primary px-2 py-1 text-[10px] font-bold text-on-primary disabled:opacity-60"
-                    >
-                      שמירה
-                    </button>
-                  </div>
+              <button
+                key={key}
+                onClick={() => {
+                  if (!posted) { markPosted(key); return; }
+                  if (hasLink) window.open(link!, "_blank", "noopener,noreferrer");
+                }}
+                disabled={saving}
+                style={posted ? {
+                  color,
+                  borderColor: color,
+                  backgroundColor: `${color}1A`,
+                  borderStyle: isUnlisted ? "dashed" : "solid",
+                } : undefined}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors disabled:opacity-60 ${
+                  posted
+                    ? "hover:opacity-80"
+                    : "border-outline-variant text-on-surface-variant hover:border-primary/40"
+                }`}
+              >
+                <Icon className="h-4 w-4" style={posted ? { color } : undefined} />
+                {label}
+                {posted && hasLink && (
+                  <span className="material-symbols-outlined text-xs">open_in_new</span>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
