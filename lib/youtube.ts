@@ -111,6 +111,33 @@ async function addToPlaylist(
   }
 }
 
+export async function fetchYouTubeStats(videoId: string): Promise<{
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+} | null> {
+  try {
+    const accessToken = await getAccessToken();
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoId}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      items?: { statistics?: { viewCount?: string; likeCount?: string; commentCount?: string } }[];
+    };
+    const stats = json.items?.[0]?.statistics;
+    if (!stats) return null;
+    return {
+      views: stats.viewCount != null ? parseInt(stats.viewCount, 10) : null,
+      likes: stats.likeCount != null ? parseInt(stats.likeCount, 10) : null,
+      comments: stats.commentCount != null ? parseInt(stats.commentCount, 10) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function uploadToYouTube(params: {
   videoPath: string;
   title: string;

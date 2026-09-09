@@ -10,6 +10,7 @@ import {
   updateClipCopyPathAction,
   listClipPerformanceAction,
   upsertClipPerformanceAction,
+  deleteClipPerformanceAction,
   searchClipPathsAction,
   updateClipTranscriptAction,
   updateClipThumbnailAction,
@@ -65,7 +66,7 @@ export function ExpandedClipDetails({
   onCopyPlatformsChange: (platforms: string[]) => void;
   contextTagOptions: string[];
 }) {
-  const [activeTab, setActiveTab] = useState<"details" | "copies">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "copies" | "performance">("details");
   const [showTranscript, setShowTranscript] = useState(false);
   const [editingTranscript, setEditingTranscript] = useState(false);
   const [transcriptText, setTranscriptText] = useState(fullClip?.transcript ?? "");
@@ -508,9 +509,29 @@ export function ExpandedClipDetails({
           >
             עותקים ({copies.length})
           </button>
+          <button
+            onClick={() => setActiveTab("performance")}
+            className={`flex-1 rounded-full py-2 text-xs font-bold transition-colors ${
+              activeTab === "performance"
+                ? "bg-primary text-on-primary shadow-sm"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            סטטיסטיקה
+          </button>
         </div>
 
-        {activeTab === "copies" ? (
+        {activeTab === "performance" ? (
+          <PerformanceTab
+            clipDetId={item.clip.id}
+            copies={copies}
+            performance={performance}
+            onPerformanceChange={(next) => {
+              setPerformance(next);
+              notifyPlatforms(copies, next);
+            }}
+          />
+        ) : activeTab === "copies" ? (
           <div className="space-y-4">
             {copies.length > 0 ? (
               <ul className="space-y-2">
@@ -881,6 +902,280 @@ export function ExpandedClipDetails({
         </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function PerformanceTab({
+  clipDetId,
+  copies,
+  performance,
+  onPerformanceChange,
+}: {
+  clipDetId: string;
+  copies: ClipCopy[];
+  performance: ClipPerformance[];
+  onPerformanceChange: (next: ClipPerformance[]) => void;
+}) {
+  const [platform, setPlatform] = useState<"tiktok" | "instagram">("tiktok");
+  const [extracting, setExtracting] = useState(false);
+  const [extracted, setExtracted] = useState<{
+    views: number | null;
+    likes: number | null;
+    shares: number | null;
+    comments: number | null;
+  } | null>(null);
+  const [editedMetrics, setEditedMetrics] = useState({
+    views: "",
+    likes: "",
+    shares: "",
+    comments: "",
+  });
+  const [saving, startSaving] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [ytStats, setYtStats] = useState<{
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+  } | null>(null);
+  const [ytLoading, setYtLoading] = useState(false);
+
+  const ytCopy = copies.find(
+    (c) =>
+      (c.platform ?? "").toLowerCase().startsWith("youtube") &&
+      isUrlPath(c.path)
+  );
+
+  async function fetchYtStats() {
+    setYtLoading(true);
+    try {
+      const res = await fetch(`/api/clips/youtube-stats?clipDetId=${clipDetId}`);
+      if (res.ok) setYtStats(await res.json());
+    } finally {
+      setYtLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (ytCopy) fetchYtStats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clipDetId]);
+
+  async function runExtraction(dataUrl: string) {
+    setError(null);
+    setExtracting(true);
+    setExtracted(null);
+    try {
+      const res = await fetch("/api/clips/extract-performance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: dataUrl, platform }),
+      });
+      if (!res.ok) throw new Error("Extraction failed");
+      const data = (await res.json()) as {
+        views: number | null;
+        likes: number | null;
+        shares: number | null;
+        comments: number | null;
+      };
+      setExtracted(data);
+      setEditedMetrics({
+        views: data.views?.toString() ?? "",
+        likes: data.likes?.toString() ?? "",
+        shares: data.shares?.toString() ?? "",
+        comments: data.comments?.toString() ?? "",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "שגיאה בחילוץ נתונים");
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const item = Array.from(e.clipboardData.items).find((i) =>
+      i.type.startsWith("image/")
+    );
+    if (!item) return;
+    const blob = item.getAsFile();
+    if (!blob) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") runExtraction(reader.result);
+    };
+    reader.readAsDataURL(blob);
+  }
+
+  function saveExtracted() {
+    startSaving(async () => {
+      const row = await upsertClipPerformanceAction({
+        clip_det_id: clipDetId,
+        platform,
+        views: editedMetrics.views ? parseInt(editedMetrics.views, 10) : null,
+        likes: editedMetrics.likes ? parseInt(editedMetrics.likes, 10) : null,
+        shares: editedMetrics.shares ? parseInt(editedMetrics.shares, 10) : null,
+        comments: editedMetrics.comments ? parseInt(editedMetrics.comments, 10) : null,
+        status: null,
+        hook_key_line: null,
+        hashtags: null,
+        live_post_url: null,
+        date_posted: new Date().toISOString().slice(0, 10),
+      });
+      onPerformanceChange([row, ...performance]);
+      setExtracted(null);
+    });
+  }
+
+  async function deleteRecord(id: string) {
+    await deleteClipPerformanceAction(id);
+    onPerformanceChange(performance.filter((p) => p.id !== id));
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* YouTube auto-fetch */}
+      {ytCopy && (
+        <div className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">YouTube</span>
+            <button
+              onClick={fetchYtStats}
+              disabled={ytLoading}
+              className="flex items-center gap-1 text-[10px] text-primary hover:underline disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-xs">refresh</span>
+              {ytLoading ? "טוען..." : "עדכון"}
+            </button>
+          </div>
+          {ytStats ? (
+            <div className="grid grid-cols-3 gap-2">
+              <SmallMetric label="צפיות" value={ytStats.views} />
+              <SmallMetric label="לייקים" value={ytStats.likes} />
+              <SmallMetric label="תגובות" value={ytStats.comments} />
+            </div>
+          ) : ytLoading ? (
+            <p className="text-xs text-on-surface-variant">טוען...</p>
+          ) : (
+            <p className="text-xs text-on-surface-variant/60">לחץ עדכון לטעינת נתוני YouTube</p>
+          )}
+        </div>
+      )}
+
+      {/* History */}
+      {performance.length > 0 && (
+        <div>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">היסטוריה</p>
+          <div className="space-y-1">
+            {performance.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-2 rounded border border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-xs"
+              >
+                <span className="w-20 shrink-0 text-on-surface-variant">{p.date_posted ? String(p.date_posted).slice(0, 10) : "—"}</span>
+                <span className="w-16 shrink-0 font-bold capitalize text-on-surface">{p.platform ?? "—"}</span>
+                <span className="flex-1 text-on-surface-variant">
+                  {[
+                    p.views != null ? `${p.views.toLocaleString()} צפיות` : "",
+                    p.likes != null ? `${p.likes.toLocaleString()} לייקים` : "",
+                    p.shares != null ? `${p.shares.toLocaleString()} שיתופים` : "",
+                    p.comments != null ? `${p.comments.toLocaleString()} תגובות` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+                <button
+                  onClick={() => deleteRecord(p.id)}
+                  className="shrink-0 text-on-surface-variant/60 hover:text-error"
+                  aria-label="מחיקה"
+                >
+                  <span className="material-symbols-outlined text-sm">delete</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Paste area for TikTok / Instagram */}
+      <div>
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          הוספת נתוני ביצוע
+        </p>
+        <div className="mb-2 flex gap-2">
+          {(["tiktok", "instagram"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => { setPlatform(p); setExtracted(null); }}
+              className={`rounded-full border px-3 py-1 text-[11px] font-bold transition-colors ${
+                platform === p
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-outline-variant text-on-surface-variant hover:border-primary/40"
+              }`}
+            >
+              {p === "tiktok" ? "TikTok" : "Instagram"}
+            </button>
+          ))}
+        </div>
+
+        <div
+          onPaste={handlePaste}
+          tabIndex={0}
+          className="flex min-h-[72px] cursor-text items-center justify-center rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-lowest p-4 text-center text-xs text-on-surface-variant transition-colors hover:border-primary/40 focus:border-primary focus:outline-none"
+        >
+          {extracting ? (
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined animate-spin text-sm">autorenew</span>
+              מחלצת נתונים...
+            </span>
+          ) : (
+            <span>
+              לחץ כאן, ואז הדבק צילום מסך מ-{platform === "tiktok" ? "TikTok" : "Instagram"}{" "}
+              <span className="font-bold">(Ctrl+V)</span>
+            </span>
+          )}
+        </div>
+
+        {error && <p className="mt-1 text-xs text-error">{error}</p>}
+
+        {extracted && (
+          <div className="mt-3 space-y-2 rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">נתונים שחולצו</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["views", "likes", "shares", "comments"] as const).map((field) => (
+                <div key={field}>
+                  <label className="mb-0.5 block text-[10px] text-on-surface-variant">
+                    {field === "views" ? "צפיות" : field === "likes" ? "לייקים" : field === "shares" ? "שיתופים" : "תגובות"}
+                  </label>
+                  <input
+                    type="number"
+                    value={editedMetrics[field]}
+                    onChange={(e) =>
+                      setEditedMetrics((prev) => ({ ...prev, [field]: e.target.value }))
+                    }
+                    className="w-full rounded border border-outline-variant bg-surface px-2 py-1 text-xs text-on-surface focus:border-primary focus:outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={saveExtracted}
+              disabled={saving}
+              className="w-full rounded-full bg-primary py-2 text-xs font-bold text-on-primary disabled:opacity-60"
+            >
+              {saving ? "שומרת..." : "שמירה"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SmallMetric({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="text-center">
+      <p className="text-[10px] text-on-surface-variant">{label}</p>
+      <p className="text-sm font-bold text-on-surface">{value != null ? value.toLocaleString() : "—"}</p>
     </div>
   );
 }
