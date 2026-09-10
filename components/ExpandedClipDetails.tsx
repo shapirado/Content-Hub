@@ -971,7 +971,10 @@ function PerformanceTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: dataUrl, platform }),
       });
-      if (!res.ok) throw new Error("Extraction failed");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({})) as { error?: string; raw?: string };
+        throw new Error(errJson.raw ? `${errJson.error ?? "Extraction failed"}: ${errJson.raw}` : (errJson.error ?? "Extraction failed"));
+      }
       const data = (await res.json()) as {
         views: number | null;
         likes: number | null;

@@ -24,7 +24,7 @@ export async function POST(req: Request) {
 
   const msg = await client.messages.create({
     model: "claude-opus-5",
-    max_tokens: 256,
+    max_tokens: 512,
     messages: [
       {
         role: "user",
@@ -35,19 +35,22 @@ export async function POST(req: Request) {
           },
           {
             type: "text",
-            text: `This is a ${platform} post screenshot. Extract the performance metrics and return ONLY a JSON object with these keys: views, likes, shares, comments. Use integers (no commas, no K/M — convert abbreviations). Use null for any metric not visible in the screenshot. Example: {"views":15000,"likes":432,"shares":null,"comments":28}`,
+            text: `This is a ${platform} analytics/insights screenshot (may be in Hebrew). Extract these performance metrics: views (צפיות/plays/views), likes (לייקים/likes), shares (שיתופים/shares), comments (תגובות/comments). Return ONLY a JSON object with keys: views, likes, shares, comments. Use plain integers (convert K/M abbreviations to full numbers). Use null for any metric not visible. Example: {"views":15000,"likes":432,"shares":null,"comments":28}`,
           },
         ],
       },
     ],
   });
 
-  const text = msg.content.find((b) => b.type === "text")
+  const rawText = msg.content.find((b) => b.type === "text")
     ? (msg.content.find((b) => b.type === "text") as { type: "text"; text: string }).text
     : "";
-  const jsonMatch = text.match(/\{[\s\S]*?\}/);
+
+  // Greedy match to capture the full JSON object (including all fields)
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    return NextResponse.json({ error: "Could not parse metrics from screenshot" }, { status: 422 });
+    console.error("extract-performance: no JSON in Claude response:", rawText.slice(0, 300));
+    return NextResponse.json({ error: "Could not parse metrics from screenshot", raw: rawText.slice(0, 200) }, { status: 422 });
   }
 
   try {
@@ -64,6 +67,7 @@ export async function POST(req: Request) {
       comments: parsed.comments ?? null,
     });
   } catch {
-    return NextResponse.json({ error: "Invalid JSON from Claude" }, { status: 422 });
+    console.error("extract-performance: invalid JSON from Claude:", jsonMatch[0].slice(0, 300));
+    return NextResponse.json({ error: "Invalid JSON from Claude", raw: rawText.slice(0, 200) }, { status: 422 });
   }
 }
