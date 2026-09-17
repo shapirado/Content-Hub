@@ -130,7 +130,7 @@ export function ExpandedClipDetails({
     startRegeneratingHook(async () => {
       try {
         const result = await regenerateHookAction(item.clip.id);
-        setHooks([result.hook]);
+        setHooks(result.hooks);
       } catch (err) {
         setHookError(err instanceof Error ? err.message : "שגיאה לא ידועה");
       }
@@ -403,6 +403,23 @@ export function ExpandedClipDetails({
                         </button>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {fullClip?.cta && (
+                <div className="space-y-1 pt-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-primary">
+                    קריאה לפעולה
+                  </h4>
+                  <div className="flex items-center justify-between rounded border border-outline-variant/30 bg-surface-container-lowest p-3">
+                    <p className="pl-4 text-sm text-on-surface">{fullClip.cta}</p>
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(fullClip.cta!); }}
+                      className="rounded border border-outline-variant bg-surface-container px-3 py-1 text-[10px] font-bold text-on-surface transition-all hover:border-primary hover:text-primary active:scale-90"
+                    >
+                      העתקה
+                    </button>
                   </div>
                 </div>
               )}

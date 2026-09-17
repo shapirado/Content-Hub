@@ -2,11 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { ClipForPlanning, ReviewForPlanning, Event, ContentTaskInput } from "@/lib/neon";
 
 export type MassarYomContent = {
-  hook: string;
+  hooks: string[];
   tiktokHashtags: string;
   youtubeTitle: string;
   pillar: string;
   summary: string;
+  cta: string;
   tag: string | null;
 };
 
@@ -161,18 +162,41 @@ ${transcript}
 ${niritCaption}
 """
 
+## הנחיות תוכן לרשתות חברתיות
+
+### הוקים (שורות פתיחה) — 4 אפשרויות בסגנונות שונים
+צרי בדיוק 4 הוקים, כל אחד בסגנון אחר (עד 80 תווים, עברית):
+1. **שאלה פרובוקטיבית** — שאלה שמאתגרת את הצופה ומעוררת עצירה
+2. **הצהרה נגד הזרם** — טענה נועזת ומפתיעה שסותרת ציפייה
+3. **סקרנות + מיסטיקה** — פותח פער סקרנות, מרמז על גילוי
+4. **ישיר ואישי** — פנייה ישירה לצופה, קריאת שם או תחושה
+
+### האשטגים לאינסטגרם/טיקטוק
+- 3-5 האשטגים רלוונטיים בלבד (עברית ואנגלית)
+- מותאמים לפלטפורמה: אינסטגרם — בלוק נפרד בסוף הפוסט; טיקטוק — שזורים בטקסט או בסוף
+- רלוונטיים לתוכן הספציפי, לא גנריים
+
+### קריאה לפעולה
+- משפט קצר בסוף שמזמין אינטראקציה (שאלה לקהל, בקשה לשתף, הנעה לפעולה)
+
+### אמוג'י
+- השתמשי באמוג'י המתאים לפלטפורמה ולמסר — לא יותר מ-2-3 בפוסט שלם
+
+---
+
 צרי פלט JSON בלבד עם השדות הבאים:
-- hook: שתי שורות פתיחה מושכות לטיקטוק (עד 80 תווים, עברית, pattern-interrupt)
-- tiktokHashtags: 5-7 האשטגים לטיקטוק (עברית ואנגלית, מופרדים ברווח)
+- hooks: מערך של בדיוק 4 הוקים בסגנונות השונים שלעיל (כל אחד עד 80 תווים, עברית)
+- tiktokHashtags: 3-5 האשטגים לטיקטוק/אינסטגרם (עברית ואנגלית, מופרדים ברווח)
 - youtubeTitle: כותרת קצרה ליוטיוב (עברית, עד 60 תווים)
 - pillar: עמוד תוכן אחד מהרשימה הבאה בדיוק כפי שכתוב: "Body & Sensation", "Consciousness Reframes", "Professional Identity", "Testimonial/Carousel"
 - summary: סיכום קצר של הסרטון במשפט אחד-שניים בעברית (מה הוא עוסק, לא לשחזר את ה-hook)
+- cta: קריאה לפעולה קצרה בעברית (משפט אחד, שאלה או הנעה)
 - tag: אם התוכן קשור לחג, עונה, אירוע עם תאריך, או הזדמנות מוגבלת בזמן — ספקי תגית בפורמט "קטגוריה-פירוט" (דוגמאות: "חגים-ראש השנה", "חגים-פסח", "עונתי-קיץ", "אירועים-ריטריט"). אם התוכן כללי ועל-זמני — החזירי null.
 
 ללא טקסט נוסף לפני או אחרי ה-JSON.
 
 \`\`\`json
-{ "hook": "...", "tiktokHashtags": "...", "youtubeTitle": "...", "pillar": "...", "summary": "...", "tag": null }
+{ "hooks": ["שאלה פרובוקטיבית...", "הצהרה נגד הזרם...", "סקרנות + מיסטיקה...", "ישיר ואישי..."], "tiktokHashtags": "...", "youtubeTitle": "...", "pillar": "...", "summary": "...", "cta": "...", "tag": null }
 \`\`\``;
 
   const message = await anthropic.messages
@@ -200,21 +224,23 @@ ${niritCaption}
   const p = parsed as Record<string, unknown>;
   const VALID_PILLARS = ["Body & Sensation", "Consciousness Reframes", "Professional Identity", "Testimonial/Carousel"];
   if (
-    typeof p.hook !== "string" ||
+    !Array.isArray(p.hooks) || (p.hooks as unknown[]).length === 0 ||
     typeof p.tiktokHashtags !== "string" ||
     typeof p.youtubeTitle !== "string" ||
     typeof p.pillar !== "string" ||
-    typeof p.summary !== "string"
+    typeof p.summary !== "string" ||
+    typeof p.cta !== "string"
   ) {
     throw new Error(`Claude response missing required fields: ${cleaned.slice(0, 200)}`);
   }
 
   return {
-    hook: p.hook,
+    hooks: p.hooks as string[],
     tiktokHashtags: p.tiktokHashtags,
     youtubeTitle: p.youtubeTitle,
     pillar: VALID_PILLARS.includes(p.pillar) ? p.pillar : "Consciousness Reframes",
     summary: p.summary,
+    cta: p.cta,
     tag: typeof p.tag === "string" && p.tag.trim().length > 0 ? p.tag.trim() : null,
   };
 }

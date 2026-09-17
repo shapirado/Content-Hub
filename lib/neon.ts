@@ -29,6 +29,7 @@ export type ClipDetails = {
   wardrobe: string | null;
   org_whatsapp_text: string | null;
   original_filename: string | null;
+  cta: string | null;
 };
 
 /** One physical copy of a clip_details row (a Drive file or a YouTube upload). `platform` (e.g. "instagram") records where that specific copy was posted, when known. `title` is an optional human-friendly label for this specific copy. */
@@ -188,7 +189,7 @@ export async function getClipDetails(id: string): Promise<ClipDetails | null> {
   const rows = (await client`
     select id, duration_seconds, language, transcript, summary, hooks, warning, created_at,
            thumbnail, tag, title, pillar, season, context_tags, usable, posted_to_tiktok, wardrobe,
-           org_whatsapp_text, original_filename
+           org_whatsapp_text, original_filename, cta
     from clip_details
     where id = ${id}
   `) as unknown as ClipDetails[];
@@ -925,8 +926,9 @@ export async function createMassarYom(data: {
   youtubeTitle: string;
   transcript: string;
   summary: string;
-  hook: string;
+  hooks: string[];
   tiktokHashtags: string;
+  cta: string;
   niritCaption: string;
   scheduledDate: string;
   videoPath: string;
@@ -947,12 +949,12 @@ export async function createMassarYom(data: {
   await client`
     INSERT INTO clip_details
       (id, title, transcript, summary, hooks, context_tags, usable, posted_to_tiktok,
-       source_type, pillar, tag, thumbnail, org_whatsapp_text, original_filename, google_drive_uploaded)
+       source_type, pillar, tag, thumbnail, org_whatsapp_text, original_filename, google_drive_uploaded, cta)
     VALUES
       (${data.clipDetId}::uuid, ${displayTitle}, ${data.transcript}, ${data.summary},
-       ${JSON.stringify([data.hook])}::jsonb, ARRAY[]::text[], 'usable', false,
+       ${JSON.stringify(data.hooks)}::jsonb, ARRAY[]::text[], 'usable', false,
        ${data.sourceType}, ${data.pillar}, ${data.tag}, ${data.thumbnail},
-       ${data.niritCaption}, ${data.originalFilename}, ${googleDriveUploaded})
+       ${data.niritCaption}, ${data.originalFilename}, ${googleDriveUploaded}, ${data.cta})
   `;
 
   await client`
@@ -960,9 +962,9 @@ export async function createMassarYom(data: {
       (clip_det_id, event_id, platform, scheduled_date, status, hook, caption, hashtags)
     VALUES
       (${data.clipDetId}::uuid, null, 'tiktok', ${data.scheduledDate}::date,
-       'ai_draft', ${data.hook}, ${data.niritCaption}, ${data.tiktokHashtags}),
+       'ai_draft', ${data.hooks[0] ?? ""}, ${data.niritCaption}, ${data.tiktokHashtags}),
       (${data.clipDetId}::uuid, null, 'youtube', ${data.scheduledDate}::date,
-       'ai_draft', ${data.hook}, ${data.niritCaption}, null)
+       'ai_draft', ${data.hooks[0] ?? ""}, ${data.niritCaption}, null)
   `;
 }
 

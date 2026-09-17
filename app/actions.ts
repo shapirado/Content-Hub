@@ -476,7 +476,7 @@ export async function createMassarYomAction(
   ]);
 
   if (contentResult.status === "rejected") throw contentResult.reason;
-  const { hook, tiktokHashtags, youtubeTitle, pillar, summary, tag } = contentResult.value;
+  const { hooks, tiktokHashtags, youtubeTitle, pillar, summary, cta, tag } = contentResult.value;
 
   const isGoogleDriveUrl = driveUrl !== null && /drive\.google\.com/i.test(driveUrl);
 
@@ -485,8 +485,9 @@ export async function createMassarYomAction(
     youtubeTitle,
     transcript,
     summary,
-    hook,
+    hooks,
     tiktokHashtags,
+    cta,
     niritCaption: niritCaption.trim(),
     scheduledDate,
     videoPath,
@@ -602,16 +603,16 @@ export async function updateClipThumbnailAction(
 
 export async function regenerateHookAction(
   clipDetId: string
-): Promise<{ hook: string; tiktokHashtags: string; youtubeTitle: string }> {
+): Promise<{ hooks: string[]; tiktokHashtags: string; youtubeTitle: string }> {
   await requireSession();
   const detail = await getClipDetails(clipDetId);
   if (!detail) throw new Error("קליפ לא נמצא");
   const transcript = detail.transcript ?? "";
   const niritCaption = detail.org_whatsapp_text ?? "";
-  const { hook, tiktokHashtags, youtubeTitle } = await generateMassarYomContent(
+  const { hooks, tiktokHashtags, youtubeTitle } = await generateMassarYomContent(
     transcript,
     niritCaption
   );
-  await updateClipHooks(clipDetId, [hook]);
-  return { hook, tiktokHashtags, youtubeTitle };
+  await updateClipHooks(clipDetId, hooks);
+  return { hooks, tiktokHashtags, youtubeTitle };
 }

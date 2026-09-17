@@ -111,7 +111,7 @@ export async function POST(req: Request) {
       const msg = (contentResult.reason as Error)?.message ?? "שגיאה ביצירת תוכן";
       return NextResponse.json({ error: msg }, { status: 502 });
     }
-    const { hook, tiktokHashtags, youtubeTitle, pillar, summary, tag } = contentResult.value;
+    const { hooks, tiktokHashtags, youtubeTitle, pillar, summary, cta, tag } = contentResult.value;
 
     const isGoogleDriveUrl = driveUrl !== null && /drive\.google\.com/i.test(driveUrl);
 
@@ -120,8 +120,9 @@ export async function POST(req: Request) {
       youtubeTitle,
       transcript,
       summary,
-      hook,
+      hooks,
       tiktokHashtags,
+      cta,
       niritCaption: niritCaption.trim(),
       scheduledDate,
       videoPath,
