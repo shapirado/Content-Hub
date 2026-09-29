@@ -52,6 +52,7 @@ export const OPTIONS = {
     { value: "תכלת מקושקשת", label: "תכלת מקושקשת", colorHex: null, image: "/תכלת מקושקש.png" },
     { value: "צהוב זרחני", label: "צהוב זרחני", colorHex: "#EFFF79", image: null },
     { value: "צבעוני", label: "צבעוני", colorHex: null, image: "/צבעוני.png" },
+    { value: "לבן", label: "לבן", colorHex: "#FFFFFF", image: null },
     { value: "דוגמא שחור על חום", label: "דוגמא שחור על חום", colorHex: null, image: "/דוגמא שחור על חום.png" },
     { value: "לבן עם דוגמא", label: "לבן עם דוגמא", colorHex: null, image: "/לבן עם דוגמא.png" },
   ],
