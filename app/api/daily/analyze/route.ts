@@ -63,6 +63,7 @@ export async function POST(req: Request) {
     const videoUrlRaw = formData.get("videoUrl");
     const scheduledDate = formData.get("scheduledDate");
     const niritCaption = formData.get("niritCaption");
+    const generateMarketing = formData.get("generateMarketing") === "true";
 
     const driveUrl =
       typeof videoUrlRaw === "string" && videoUrlRaw.trim()
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
         description: niritCaption.trim(),
         hashtags: "",
       }),
-      generateMassarYomContent(transcript, niritCaption.trim()),
+      generateMassarYomContent(transcript, niritCaption.trim(), generateMarketing),
     ]);
 
     if (contentResult.status === "rejected") {

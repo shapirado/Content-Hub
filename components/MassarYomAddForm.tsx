@@ -26,6 +26,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
   const [videoUrl, setVideoUrl] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [caption, setCaption] = useState("");
+  const [generateMarketing, setGenerateMarketing] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [youtubeWarning, setYoutubeWarning] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
         if (videoUrl.trim()) formData.set("videoUrl", videoUrl.trim());
         formData.set("scheduledDate", scheduledDate);
         formData.set("niritCaption", caption.trim());
+        formData.set("generateMarketing", generateMarketing ? "true" : "false");
 
         const res = await fetch("/api/daily/analyze", { method: "POST", body: formData });
         const result = await res.json() as { clipDetId?: string; youtubeError?: string | null; error?: string };
@@ -205,6 +207,17 @@ export function MassarYomAddForm({ onDone }: { onDone: () => void }) {
           className="w-full resize-none rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-right text-sm text-on-surface outline-none focus:border-primary"
         />
       </div>
+
+      {/* Marketing content toggle */}
+      <label className="flex items-center gap-2 text-sm text-on-surface">
+        <input
+          type="checkbox"
+          checked={generateMarketing}
+          onChange={(e) => setGenerateMarketing(e.target.checked)}
+          className="h-4 w-4 rounded border-outline-variant accent-primary"
+        />
+        לייצר גם תוכן שיווקי
+      </label>
 
       {error && (
         <p className="rounded-xl bg-error/10 px-3 py-2 text-sm text-error">{error}</p>

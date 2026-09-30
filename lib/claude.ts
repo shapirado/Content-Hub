@@ -147,9 +147,37 @@ export function parseContentPlanResponse(text: string): ContentTaskInput[] {
 
 export async function generateMassarYomContent(
   transcript: string,
-  niritCaption: string
+  niritCaption: string,
+  generateMarketing: boolean = true
 ): Promise<MassarYomContent> {
   const anthropic = client();
+
+  const hooksAndCtaInstructions = generateMarketing
+    ? `### הוקים (שורות פתיחה) — 4 אפשרויות בסגנונות שונים
+צרי בדיוק 4 הוקים, כל אחד בסגנון אחר (עד 80 תווים, עברית):
+1. **שאלה פרובוקטיבית** — שאלה שמאתגרת את הצופה ומעוררת עצירה
+2. **הצהרה נגד הזרם** — טענה נועזת ומפתיעה שסותרת ציפייה
+3. **סקרנות + מיסטיקה** — פותח פער סקרנות, מרמז על גילוי
+4. **ישיר ואישי** — פנייה ישירה לצופה, קריאת שם או תחושה
+
+### קריאה לפעולה
+- משפט קצר בסוף שמזמין אינטראקציה (שאלה לקהל, בקשה לשתף, הנעה לפעולה)
+
+`
+    : "";
+
+  const hooksAndCtaFields = generateMarketing
+    ? `- hooks: מערך של בדיוק 4 הוקים בסגנונות השונים שלעיל (כל אחד עד 80 תווים, עברית)
+- cta: קריאה לפעולה קצרה בעברית (משפט אחד, שאלה או הנעה)
+`
+    : `- hooks: מערך ריק []
+- cta: מחרוזת ריקה ""
+`;
+
+  const jsonExample = generateMarketing
+    ? `{ "hooks": ["שאלה פרובוקטיבית...", "הצהרה נגד הזרם...", "סקרנות + מיסטיקה...", "ישיר ואישי..."], "tiktokHashtags": "...", "youtubeTitle": "...", "pillar": "...", "summary": "...", "cta": "...", "tag": null }`
+    : `{ "hooks": [], "tiktokHashtags": "...", "youtubeTitle": "...", "pillar": "...", "summary": "...", "cta": "", "tag": null }`;
+
   const prompt = `יש לך תמלול של קליפ רוחני קצר של נירית שפירא ואת הפוסט המקורי שלה.
 
 תמלול הקליפ:
@@ -164,20 +192,10 @@ ${niritCaption}
 
 ## הנחיות תוכן לרשתות חברתיות
 
-### הוקים (שורות פתיחה) — 4 אפשרויות בסגנונות שונים
-צרי בדיוק 4 הוקים, כל אחד בסגנון אחר (עד 80 תווים, עברית):
-1. **שאלה פרובוקטיבית** — שאלה שמאתגרת את הצופה ומעוררת עצירה
-2. **הצהרה נגד הזרם** — טענה נועזת ומפתיעה שסותרת ציפייה
-3. **סקרנות + מיסטיקה** — פותח פער סקרנות, מרמז על גילוי
-4. **ישיר ואישי** — פנייה ישירה לצופה, קריאת שם או תחושה
-
-### האשטגים לאינסטגרם/טיקטוק
+${hooksAndCtaInstructions}### האשטגים לאינסטגרם/טיקטוק
 - 3-5 האשטגים רלוונטיים בלבד (עברית ואנגלית)
 - מותאמים לפלטפורמה: אינסטגרם — בלוק נפרד בסוף הפוסט; טיקטוק — שזורים בטקסט או בסוף
 - רלוונטיים לתוכן הספציפי, לא גנריים
-
-### קריאה לפעולה
-- משפט קצר בסוף שמזמין אינטראקציה (שאלה לקהל, בקשה לשתף, הנעה לפעולה)
 
 ### אמוג'י
 - השתמשי באמוג'י המתאים לפלטפורמה ולמסר — לא יותר מ-2-3 בפוסט שלם
@@ -185,18 +203,16 @@ ${niritCaption}
 ---
 
 צרי פלט JSON בלבד עם השדות הבאים:
-- hooks: מערך של בדיוק 4 הוקים בסגנונות השונים שלעיל (כל אחד עד 80 תווים, עברית)
-- tiktokHashtags: 3-5 האשטגים לטיקטוק/אינסטגרם (עברית ואנגלית, מופרדים ברווח)
+${hooksAndCtaFields}- tiktokHashtags: 3-5 האשטגים לטיקטוק/אינסטגרם (עברית ואנגלית, מופרדים ברווח)
 - youtubeTitle: כותרת קצרה ליוטיוב (עברית, עד 60 תווים)
 - pillar: עמוד תוכן אחד מהרשימה הבאה בדיוק כפי שכתוב: "Body & Sensation", "Consciousness Reframes", "Professional Identity", "Testimonial/Carousel"
 - summary: סיכום קצר של הסרטון במשפט אחד-שניים בעברית (מה הוא עוסק, לא לשחזר את ה-hook)
-- cta: קריאה לפעולה קצרה בעברית (משפט אחד, שאלה או הנעה)
 - tag: אם התוכן קשור לחג, עונה, אירוע עם תאריך, או הזדמנות מוגבלת בזמן — ספקי תגית בפורמט "קטגוריה-פירוט" (דוגמאות: "חגים-ראש השנה", "חגים-פסח", "עונתי-קיץ", "אירועים-ריטריט"). אם התוכן כללי ועל-זמני — החזירי null.
 
 ללא טקסט נוסף לפני או אחרי ה-JSON.
 
 \`\`\`json
-{ "hooks": ["שאלה פרובוקטיבית...", "הצהרה נגד הזרם...", "סקרנות + מיסטיקה...", "ישיר ואישי..."], "tiktokHashtags": "...", "youtubeTitle": "...", "pillar": "...", "summary": "...", "cta": "...", "tag": null }
+${jsonExample}
 \`\`\``;
 
   const message = await anthropic.messages
@@ -224,7 +240,8 @@ ${niritCaption}
   const p = parsed as Record<string, unknown>;
   const VALID_PILLARS = ["Body & Sensation", "Consciousness Reframes", "Professional Identity", "Testimonial/Carousel"];
   if (
-    !Array.isArray(p.hooks) || (p.hooks as unknown[]).length === 0 ||
+    !Array.isArray(p.hooks) ||
+    (generateMarketing && (p.hooks as unknown[]).length === 0) ||
     typeof p.tiktokHashtags !== "string" ||
     typeof p.youtubeTitle !== "string" ||
     typeof p.pillar !== "string" ||
